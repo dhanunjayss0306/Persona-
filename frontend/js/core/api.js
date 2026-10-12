@@ -8,11 +8,17 @@ const API = {
     let payload;
     if (form) { payload = form; } // FormData (file upload) — browser sets content type
     else if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
+    
+    const startTime = performance.now();
     const res = await fetch(this.base + path, { method, headers, body: payload });
+    const endTime = performance.now();
+    console.debug(`API ${method} ${path} took ${Math.round(endTime - startTime)}ms`);
+
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
     return data;
   },
+
   get: (p) => API.call(p),
   post: (p, body) => API.call(p, { method: 'POST', body }),
   patch: (p, body) => API.call(p, { method: 'PATCH', body }),

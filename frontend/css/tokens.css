@@ -2,7 +2,7 @@
 :root {
   --paper:#FFFFFF; --ink:#1D1D1F; --muted:#6E6E73;
   --gold:#0071E3; --signal:#FF3B30; --charcoal:#1D1D1F;
-  --card:rgba(255,255,255,.82); --card-solid:#FFFFFF; --sand:#F5F5F7;
+  --card:rgba(255,255,255,.7); --card-solid:#FFFFFF; --sand:#F5F5F7;
   --line:rgba(0,0,0,.09);
   --danger:#FF3B30; --ok:#34C759; --accent:#0071E3;
   --r:18px; --r-sm:12px;
@@ -18,11 +18,33 @@ body {
   -webkit-font-smoothing:antialiased;
 }
 .hidden { display:none !important; }
-.pad { padding:18px 18px 110px; max-width:640px; margin:0 auto; }
-.display { font-family:var(--font-d); font-weight:700; letter-spacing:-.02em; font-size:32px; margin:6px 0 14px; }
+.pad { padding:24px 24px 110px; max-width:640px; margin:0 auto; }
+.display { font-family:var(--font-d); font-weight:700; letter-spacing:-.02em; font-size:32px; margin:8px 0 16px; }
 .display.sm { font-size:24px; }
 .muted { color:var(--muted); } .sm { font-size:12.5px; }
 .center { text-align:center; }
+
+/* Premium Glassmorphism */
+.glass {
+  background: var(--card);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.3);
+}
+
+/* Skeleton Animation */
+@keyframes shimmer {
+  0% { background-position: -468px 0 }
+  100% { background-position: 468px 0 }
+}
+.skeleton {
+  background: #f6f7f8;
+  background-image: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
 /* User's logo */
 .logoMark { width:34px; height:34px; border-radius:9px; flex:none; object-fit:contain; display:block; background:#fff; }
 .logoMark.lg { width:72px; height:72px; border-radius:18px; }
