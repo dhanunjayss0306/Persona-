@@ -1,0 +1,116 @@
+// routes/reminders.js — the heart of Persona.
+//
+// Two types:
+//   'once' — notify a single time, then status='notified' (birthdays, small things).
+//   'nag'  — notify every 5 minutes until a PROOF exists (work).
+// The ONLY thing that stops a nag is a row in `proofs` for that reminder.
+// Tapping "I have done that" without proof does nothing — by design.
+const express = require('express');
+const multer = require('multer');
+const supabase = require('../db');
+const { requireAuth } = require('../auth');
+
+const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+
+// POST /api/reminders  {title, details?, type: 'once'|'nag', due_at, proof_required?}
+router.post('/', requireAuth, async (req, res) => {
+  const { title, details, type, due_at, proof_required } = req.body || {};
+  if (!title || !type || !due_at) return res.status(400).json({ error: 'title, type, due_at required' });
+  if (!['once', 'nag'].includes(type)) return res.status(400).json({ error: "type must be 'once' or 'nag'" });
+
+  const { data, error } = await supabase.from('reminders').insert({
+    user_id: req.user.id, title, details: details || null, type, due_at,
+    proof_required: proof_required !== false,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+// GET /api/reminders?status=pending — list mine, newest first.
+router.get('/', requireAuth, async (req, res) => {
+  let q = supabase.from('reminders').select('*').eq('user_id', req.user.id).order('due_at');
+  if (req.query.status) q = q.eq('status', req.query.status);
+  const { data, error } = await q;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// GET /api/reminders/:id
+router.get('/:id', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('reminders').select('*')
+    .eq('id', req.params.id).eq('user_id', req.user.id).maybeSingle();
+  if (error || !data) return res.status(404).json({ error: 'Not found' });
+  res.json(data);
+});
+
+// PATCH /api/reminders/:id — update a task: title, details, due date,
+// type, or mark status. {title?, details?, type?, due_at?, proof_required?, status?}
+router.patch('/:id', requireAuth, async (req, res) => {
+  const allowed = ['title', 'details', 'type', 'due_at', 'proof_required', 'status'];
+  const patch = {};
+  for (const k of allowed) if (req.body?.[k] !== undefined) patch[k] = req.body[k];
+  if (patch.type && !['once', 'nag'].includes(patch.type)) {
+    return res.status(400).json({ error: "type must be 'once' or 'nag'" });
+  }
+  if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
+  const { data, error } = await supabase.from('reminders').update(patch)
+    .eq('id', req.params.id).eq('user_id', req.user.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  if (!data) return res.status(404).json({ error: 'Not found' });
+  res.json(data);
+});
+
+// DELETE /api/reminders/:id
+router.delete('/:id', requireAuth, async (req, res) => {
+  const { error } = await supabase.from('reminders').delete()
+    .eq('id', req.params.id).eq('user_id', req.user.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// POST /api/reminders/:id/proof — THE OFF SWITCH.
+// Accepts either a file (photo/voice/file) OR a text note.
+// Creates the proof row and flips the reminder to 'done'. The scheduler
+// only nags reminders with no proof — so this is what brings silence.
+router.post('/:id/proof', requireAuth, upload.single('file'), async (req, res) => {
+  const { kind, text } = req.body || {}; // kind: 'photo'|'file'|'voice'|'text'
+  if (!kind || !['photo', 'file', 'voice', 'text'].includes(kind)) {
+    return res.status(400).json({ error: "kind must be photo|file|voice|text" });
+  }
+
+  const { data: reminder } = await supabase.from('reminders').select('id,status')
+    .eq('id', req.params.id).eq('user_id', req.user.id).maybeSingle();
+  if (!reminder) return res.status(404).json({ error: 'Reminder not found' });
+  if (reminder.status === 'done') return res.json({ ok: true, already: true });
+
+  let file_url = null;
+  if (req.file) {
+    const path = `${req.user.id}/${reminder.id}/${Date.now()}-${req.file.originalname}`;
+    const { error: upErr } = await supabase.storage.from('proofs').upload(path, req.file.buffer, {
+      contentType: req.file.mimetype, upsert: true,
+    });
+    if (upErr) return res.status(500).json({ error: 'Upload failed: ' + upErr.message });
+    file_url = supabase.storage.from('proofs').getPublicUrl(path).data.publicUrl;
+  }
+  if (kind === 'text' && !text) return res.status(400).json({ error: 'text proof needs text' });
+
+  const { error: pErr } = await supabase.from('proofs').insert({
+    reminder_id: reminder.id, user_id: req.user.id, kind,
+    file_url, text: text || null,
+  });
+  if (pErr) return res.status(500).json({ error: pErr.message });
+
+  await supabase.from('reminders').update({ status: 'done' }).eq('id', reminder.id);
+  res.json({ ok: true, message: 'Proof accepted. Nagging stopped.' });
+});
+
+// GET /api/reminders/:id/proofs — see the evidence.
+router.get('/:id/proofs', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('proofs').select('*')
+    .eq('reminder_id', req.params.id).eq('user_id', req.user.id).order('created_at');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+module.exports = router;

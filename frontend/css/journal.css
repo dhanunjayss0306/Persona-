@@ -1,0 +1,17 @@
+/* Persona — 3D journal book. Only used by pages/journal.html. */
+/* 3D book — flat solid covers */
+.bookStage { perspective:1400px; display:flex; justify-content:center; padding:26px 0; }
+.book3d { width:250px; height:340px; position:relative; transform-style:preserve-3d; transform:rotateY(-24deg) rotateX(6deg); transition:transform .6s var(--spring); }
+.bookStage:hover .book3d { transform:rotateY(-8deg) rotateX(3deg); }
+.bookCover, .bookPage { position:absolute; inset:0; border-radius:6px 14px 14px 6px; backface-visibility:hidden; }
+.bookCover { background:var(--tb,#1D1D1F); color:#fff; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:8px; transform:translateZ(24px); box-shadow:18px 22px 44px rgba(0,0,0,.22); }
+.bookCover::before { content:''; position:absolute; left:14px; top:0; bottom:0; width:2px; background:rgba(255,255,255,.16); }
+.bookTitle { font-weight:700; letter-spacing:-.02em; font-size:30px; }
+.bookSub { opacity:.7; font-size:12.5px; letter-spacing:.06em; text-transform:uppercase; }
+.bookPage { background:#fff; border:1px solid var(--line); transform:translateZ(2px); padding:26px 22px; font-size:14px; overflow:auto; box-shadow:18px 22px 44px rgba(0,0,0,.12); color:var(--ink); }
+.bookPage h4 { font-weight:700; letter-spacing:-.01em; margin-bottom:8px; }
+.bookPage .mood { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+.bookNav { display:flex; gap:10px; justify-content:center; margin-bottom:14px; }
+.theme-sunset { --tb:#1D1D1F; } .theme-ocean { --tb:#1F3A5F; }
+.theme-forest { --tb:#2F5D34; } .theme-mono { --tb:#4A4A4E; }
+

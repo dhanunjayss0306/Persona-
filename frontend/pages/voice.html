@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Voice · Persona</title>
+<link rel="manifest" href="../manifest.json">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+<div id="app"><div class="page" id="page-voice">
+<div class="pad"><h2 class="display">Voice</h2><div class="card center"><button id="micBig" class="micBig">🎙</button><p class="muted" id="micHint">Tap and speak — "Tomorrow I have a meeting at 8"</p><p id="micText"></p></div><div class="card"><h3>Wake word</h3><div class="row"><input id="wakeWord" placeholder="Hey Persona"><button class="btn" id="wakeSave">Save</button></div><label class="switchRow"><span>Listen for wake word while app is open</span><input type="checkbox" id="wakeToggle"><span class="switch"></span></label><button class="btn" id="enrollBtn">🎤 Enroll my voice</button></div><div class="card"><h3>Quick actions</h3><div class="row"><input id="callName" placeholder="Call who?"><button class="btn" id="callGo">📞</button></div><div class="row"><input id="songName" placeholder="Play song on JioSaavn"><button class="btn" id="songGo">▶</button></div><div class="row"><input id="meetTitle" placeholder="Meeting title"><button class="btn" id="meetGo">📹 Meet link</button></div><div id="meetOut"></div></div><div class="card"><h3>Contacts</h3><div id="contactList"></div><div class="row"><input id="cName" placeholder="Name"><input id="cPhone" placeholder="Phone"><button class="btn" id="cAdd">+</button></div></div></div>
+</div></div>
+<script src="../js/core/api.js"></script>
+<script src="../js/core/layout.js"></script>
+<script src="../js/core/ui.js"></script>
+<script src="../js/core/auth.js"></script>
+<script src="../js/pages/voice.js"></script>
+<script>Layout.chrome('app', 'Voice', '');</script>
+</body>
+</html>

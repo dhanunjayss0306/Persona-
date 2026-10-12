@@ -1,0 +1,28 @@
+/* Persona design tokens — professional Apple/Samsung system style. Flat, no gradients. */
+:root {
+  --paper:#FFFFFF; --ink:#1D1D1F; --muted:#6E6E73;
+  --gold:#0071E3; --signal:#FF3B30; --charcoal:#1D1D1F;
+  --card:rgba(255,255,255,.82); --card-solid:#FFFFFF; --sand:#F5F5F7;
+  --line:rgba(0,0,0,.09);
+  --danger:#FF3B30; --ok:#34C759; --accent:#0071E3;
+  --r:18px; --r-sm:12px;
+  --font-d:'Inter',-apple-system,sans-serif; --font-b:'Inter',-apple-system,sans-serif;
+  --shadow:0 8px 24px rgba(0,0,0,.06);
+  --spring:cubic-bezier(.32,.72,.35,1);
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { height:100%; }
+body {
+  font-family:var(--font-b); color:var(--ink); background:var(--paper);
+  font-size:15px; line-height:1.5; overscroll-behavior-y:none;
+  -webkit-font-smoothing:antialiased;
+}
+.hidden { display:none !important; }
+.pad { padding:18px 18px 110px; max-width:640px; margin:0 auto; }
+.display { font-family:var(--font-d); font-weight:700; letter-spacing:-.02em; font-size:32px; margin:6px 0 14px; }
+.display.sm { font-size:24px; }
+.muted { color:var(--muted); } .sm { font-size:12.5px; }
+.center { text-align:center; }
+/* User's logo */
+.logoMark { width:34px; height:34px; border-radius:9px; flex:none; object-fit:contain; display:block; background:#fff; }
+.logoMark.lg { width:72px; height:72px; border-radius:18px; }

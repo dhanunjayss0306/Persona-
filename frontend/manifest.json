@@ -1,0 +1,23 @@
+{
+  "background_color": "#FFFFFF",
+  "description": "Persona \u2014 reminders that nag till proven, planner, journal, price tracker.",
+  "display": "standalone",
+  "icons": [
+    {
+      "sizes": "192x192",
+      "src": "icons/icon-192.png",
+      "type": "image/png"
+    },
+    {
+      "sizes": "512x512",
+      "src": "icons/icon-512.png",
+      "type": "image/png"
+    }
+  ],
+  "name": "Persona",
+  "orientation": "portrait",
+  "scope": "./",
+  "short_name": "Persona",
+  "start_url": "./index.html",
+  "theme_color": "#FFFFFF"
+}

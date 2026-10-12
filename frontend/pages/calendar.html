@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Calendar · Persona</title>
+<link rel="manifest" href="../manifest.json">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+<div id="app"><div class="page" id="page-calendar">
+<div class="pad"><div class="calHead"><button class="iconBtn" id="calPrev">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext">›</button></div><div class="calGrid" id="calGrid"></div><div id="calDay"></div></div>
+</div></div>
+<script src="../js/core/api.js"></script>
+<script src="../js/core/layout.js"></script>
+<script src="../js/core/ui.js"></script>
+<script src="../js/core/auth.js"></script>
+<script src="../js/pages/calendar.js"></script>
+<script>Layout.chrome('app', 'Calendar', 'calendar');</script>
+</body>
+</html>

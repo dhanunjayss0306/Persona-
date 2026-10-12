@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Favorites · Persona</title>
+<link rel="manifest" href="../manifest.json">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+<div id="app"><div class="page" id="page-favorites">
+<div class="pad"><h2 class="display">Favorites</h2><div class="seg" id="favSeg"><button data-f="song" class="on">Songs</button><button data-f="playlist">Playlists</button><button data-f="movie">Movies</button></div><div id="favList"></div><div class="row"><button class="fab" id="favAdd">+</button><button class="btn" id="mkPlaylist" style="margin-left:64px">♫ Make Spotify playlist</button></div></div>
+</div></div>
+<script src="../js/core/api.js"></script>
+<script src="../js/core/layout.js"></script>
+<script src="../js/core/ui.js"></script>
+<script src="../js/core/auth.js"></script>
+<script src="../js/pages/favorites.js"></script>
+<script>Layout.chrome('app', 'Favorites', '');</script>
+</body>
+</html>

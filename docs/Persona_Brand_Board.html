@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Persona — Brand Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:#14121a; color:#f4f1ea; padding:40px 24px; max-width:1060px; margin:0 auto; }
+  h1 { font-family:'Fraunces',serif; font-size:44px; margin-bottom:6px; }
+  .sub { color:#a9a49b; margin-bottom:36px; }
+  h2 { font-family:'Fraunces',serif; font-size:28px; margin:44px 0 18px; border-bottom:1px solid #2c2837; padding-bottom:8px; }
+  .card { background:#1e1b28; border:1px solid #2c2837; border-radius:16px; padding:24px; margin-bottom:20px; }
+  .row { display:flex; gap:20px; flex-wrap:wrap; }
+  .row > * { flex:1 1 280px; }
+  .swatch { border-radius:12px; padding:18px; min-height:120px; display:flex; flex-direction:column; justify-content:flex-end; margin-bottom:10px; }
+  .swatch b { font-size:15px; } .swatch span { font-size:12px; opacity:.75; font-family:monospace; }
+  .usage { font-size:13px; color:#a9a49b; line-height:1.7; }
+  .usage b { color:#f4f1ea; }
+  .fontAa { font-size:64px; line-height:1; margin-bottom:8px; }
+  .tag { display:inline-block; font-size:11px; background:#2c2837; padding:4px 10px; border-radius:20px; margin:2px 4px 2px 0; color:#cfc9bd; }
+  .rec { background:#ff8a5c; color:#1a1210; font-weight:700; }
+  a { color:#ff8a5c; }
+  .refs li { margin:10px 0; line-height:1.6; }
+  .logoBox { display:flex; gap:28px; align-items:center; flex-wrap:wrap; }
+  .logoBg { background:#f4f1ea; border-radius:16px; padding:24px; }
+  .logoBg.dark { background:#14121a; border:1px solid #2c2837; }
+  .note { font-size:13px; color:#a9a49b; margin-top:14px; line-height:1.7; }
+</style>
+</head>
+<body>
+
+<h1>Persona — Brand Board</h1>
+<p class="sub">Logo · color palettes · fonts · references. Pick one palette + one font pairing and the frontend gets built on it.</p>
+
+<h2>1 · Logo concept</h2>
+<div class="card">
+  <div class="logoBox">
+    <div class="logoBg">
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FF8A5C"/><stop offset="1" stop-color="#E84A7F"/>
+        </linearGradient></defs>
+        <rect x="8" y="8" width="104" height="104" rx="28" fill="url(#g)"/>
+        <path d="M42 88 V32 H64 A20 20 0 0 1 64 72 H42" stroke="#fff" stroke-width="11" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="63" cy="52" r="7" fill="#fff"/>
+      </svg>
+    </div>
+    <div class="logoBg dark">
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <path d="M42 88 V32 H64 A20 20 0 0 1 64 72 H42" stroke="#f4f1ea" stroke-width="11" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="63" cy="52" r="7" fill="#f4f1ea"/>
+      </svg>
+    </div>
+    <div style="flex:1 1 260px">
+      <p style="font-size:17px; font-weight:600; margin-bottom:8px;">The idea</p>
+      <p class="usage">A <b>P</b> for Persona — with a person's head sitting inside the bowl. <i>Persona</i> literally means a person / character. Left: app icon (sunset gradient tile). Right: monochrome version for headers and the splash screen.</p>
+    </div>
+  </div>
+</div>
+
+<h2>2 · Color palettes <span class="tag rec">★ new direction: D · Awwwards Gallery</span></h2>
+<div class="row">
+  <div class="card">
+    <p style="font-weight:700; margin-bottom:12px;">D · Awwwards Gallery <span class="tag rec">from awwwards.com</span></p>
+    <div class="swatch" style="background:#F4F3EF; color:#141414; border:1px solid #e5e2d9;"><b>Warm paper</b><span>#F4F3EF · app background</span></div>
+    <div class="swatch" style="background:#141414; color:#F4F3EF;"><b>Gallery ink</b><span>#141414 · headlines, text</span></div>
+    <div class="swatch" style="background:#C0A062; color:#1a1408;"><b>Trophy gold</b><span>#C0A062 · proof accepted, completed rings, journal cover</span></div>
+    <div class="swatch" style="background:#F7D002; color:#1a1a1a;"><b>Signal yellow</b><span>#F7D002 · strict-nag alerts, score bars</span></div>
+    <div class="swatch" style="background:#1C1C1E; color:#F4F3EF;"><b>Charcoal card</b><span>#1C1C1E · dark cards, bottom nav pill, night surfaces</span></div>
+    <div class="swatch" style="background:#8A8A8A; color:#fff;"><b>Muted gray</b><span>#8A8A8A · secondary text, small-caps labels</span></div>
+    <p class="usage"><b>Feels:</b> monumental Swiss-minimal gallery — ultra-bold type on warm paper, gold trophy accents.<br><b>LIGHT-FIRST RULE (his call):</b> paper backgrounds on ALL screens — including songs/music/favorites. Charcoal is reserved for the floating nav pill and tiny accents only, never full screens.<br><b>Motion (mobile-adapted from awwwards):</b> list items rise + fade in staggered on scroll (their scroll reveals); cards press-scale on tap (their hover "+" becomes a tap ripple); sticky floating <b>pill bottom nav</b> with active-section highlight (directly theirs); 16–20px rounded cards; gold ring animation when a proof is accepted (their laurel); no preloaders — content renders instantly with shimmer skeletons.</p>
+  </div>
+  <div class="card">
+    <p style="font-weight:700; margin-bottom:12px;">A · Sunset Journal</p>
+    <div class="swatch" style="background:#FFF8F0; color:#2D1B2E;"><b>Cream paper</b><span>#FFF8F0 · app background</span></div>
+    <div class="swatch" style="background:#2D1B2E; color:#FFF8F0;"><b>Deep plum ink</b><span>#2D1B2E · text, headers</span></div>
+    <div class="swatch" style="background:linear-gradient(135deg,#FF8A5C,#E84A7F); color:#fff;"><b>Sunset gradient</b><span>#FF8A5C → #E84A7F · buttons, logo, active states</span></div>
+    <div class="swatch" style="background:#F3E4D3; color:#2D1B2E;"><b>Sand card</b><span>#F3E4D3 · cards, calendar cells</span></div>
+    <p class="usage"><b>Feels:</b> warm, personal, journal-like. <b>Use for:</b> the whole app by day; pair with the dark palette below for night mode.</p>
+  </div>
+  <div class="card">
+    <p style="font-weight:700; margin-bottom:12px;">B · Deep Focus (night mode)</p>
+    <div class="swatch" style="background:#0F1222; color:#F4F1EA; border:1px solid #2c2837;"><b>Ink navy</b><span>#0F1222 · background</span></div>
+    <div class="swatch" style="background:#1A1F3A; color:#F4F1EA;"><b>Raised surface</b><span>#1A1F3A · cards, sheets</span></div>
+    <div class="swatch" style="background:#F5B841; color:#1a1210;"><b>Amber signal</b><span>#F5B841 · nag alerts, primary buttons</span></div>
+    <div class="swatch" style="background:#3DDC97; color:#0c1a14;"><b>Mint done</b><span>#3DDC97 · completed, proof accepted</span></div>
+    <p class="usage"><b>Feels:</b> premium, calm, serious at night. <b>Use for:</b> dark mode + nag notifications (amber = urgency).</p>
+  </div>
+  <div class="card">
+    <p style="font-weight:700; margin-bottom:12px;">C · Fresh Day (clean light)</p>
+    <div class="swatch" style="background:#FAFAF7; color:#1A1D21; border:1px solid #e5e2d9;"><b>Paper white</b><span>#FAFAF7 · background</span></div>
+    <div class="swatch" style="background:#1A1D21; color:#FAFAF7;"><b>Soft black</b><span>#1A1D21 · text</span></div>
+    <div class="swatch" style="background:#0E9F8A; color:#fff;"><b>Teal go</b><span>#0E9F8A · primary actions</span></div>
+    <div class="swatch" style="background:#FF6B57; color:#fff;"><b>Coral alert</b><span>#FF6B57 · strict reminders, warnings</span></div>
+    <p class="usage"><b>Feels:</b> clean, energetic, app-store modern. <b>Use for:</b> if you want Persona to feel like a crisp utility, not a journal.</p>
+  </div>
+</div>
+
+<h2>3 · Fonts <span class="tag rec">★ my pick: Fraunces + Inter</span></h2>
+<div class="row">
+  <div class="card">
+    <p class="fontAa" style="font-family:'Fraunces',serif; font-weight:700;">Aa</p>
+    <p style="font-weight:700;">Fraunces <span class="tag rec">recommended display</span></p>
+    <p class="usage"><b>Use for:</b> app name, screen titles, journal headings, numbers on the calendar.<br><b>Why:</b> warm serif with character — makes the journal and headers feel personal, not corporate. Pairs with…</p>
+    <p class="fontAa" style="font-family:'Inter',sans-serif; font-weight:600; font-size:48px;">Aa</p>
+    <p style="font-weight:700;">Inter</p>
+    <p class="usage"><b>Use for:</b> everything else — buttons, lists, chat, forms. Tabular numbers keep times aligned.</p>
+  </div>
+  <div class="card">
+    <p class="fontAa" style="font-family:'Space Grotesk',sans-serif; font-weight:700;">Aa</p>
+    <p style="font-weight:700;">Space Grotesk</p>
+    <p class="usage"><b>Use for:</b> headings, logo-adjacent titles, stats.<br><b>Why:</b> techy and confident. Best if Persona should feel like a smart tool first, journal second.</p>
+    <p class="fontAa" style="font-family:'Inter',sans-serif; font-weight:600; font-size:48px;">Aa</p>
+    <p style="font-weight:700;">Inter</p>
+    <p class="usage"><b>Use for:</b> body/UI, same as above.</p>
+  </div>
+  <div class="card">
+    <p class="fontAa" style="font-family:'Plus Jakarta Sans',sans-serif; font-weight:800;">Aa</p>
+    <p style="font-weight:700;">Plus Jakarta Sans</p>
+    <p class="usage"><b>Use for:</b> everything — one family, many weights (500→800).<br><b>Why:</b> friendly and rounded; simplest system, zero pairing risk. The "safe modern app" choice.</p>
+    <div style="margin-top:10px"><span class="tag">H1 · 800</span><span class="tag">H2 · 700</span><span class="tag">Body · 500</span><span class="tag">Caption · 600</span></div>
+  </div>
+</div>
+<p class="note"><b>Usage rule I'll build with:</b> Display font for titles only (never paragraphs), Inter/Jakarta for UI text, semibold for buttons, tabular numbers for all times and prices. Max 2 families in the whole app.</p>
+
+<h2>4 · Reference apps worth stealing ideas from</h2>
+<div class="card"><ul class="refs">
+  <li><b>Things 3</b> — the most beautiful todo app in its category; study its calm spacing and "Today / Upcoming" views.</li>
+  <li><b>Due</b> — nagging reminders that repeat until you act. This is basically your strict-reminder feature done commercially.</li>
+  <li><b>Structured</b> — a visual timeline for planning a single day; great model for your calendar + planner day view.</li>
+  <li><b>TickTick / Todoist</b> — natural-language task entry ("meeting tomorrow 8am") like your voice parser.</li>
+</ul>
+<p class="note">Full roundups: <a href="https://www.cnn.com/cnn-underscored/reviews/best-planner-app?cid=external-feeds_iluminar_meta">CNN Underscored — best planner apps 2026</a> · <a href="https://www.lindy.ai/blog/reminder-apps-for-iphone">Lindy — best reminder apps ranked</a></p>
+</div>
+
+<h2>5 · Samsung apps style <span class="tag rec">glassmorphism — his call (NOT Good Lock)</span></h2>
+<div class="card">
+<ul class="refs">
+  <li><b>Frosted glass surfaces</b> — translucent headers, sheets and cards with backdrop blur over the paper background. Layered, airy, soft.</li>
+  <li><b>Soft color presentation</b> — Samsung's airy pastels and gentle gradient washes; color in glows, never harsh flats.</li>
+  <li><b>Big collapsing headers</b> — large bold screen title that shrinks into the toolbar on scroll; content lives in the thumb zone.</li>
+  <li><b>Squircle cards, hairline dividers</b> — generous rounded corners, whisper-thin separators, soft shadows.</li>
+  <li><b>Pill bottom nav</b> — floating, charcoal, active-section highlight (awwwards and Samsung agree here).</li>
+  <li><b>Springy micro-motion</b> — sheets slide up with spring, toggles bounce softly, list items rise + fade staggered. Nothing linear or harsh.</li>
+  <li><b>Segmented controls + big switches</b> — for reminder type (once / strict), planner ranges, music filters.</li>
+</ul>
+<p class="note">Rule of thumb: if a screen would look at home in Samsung Clock, Calendar or SmartThings — frosted, soft, light — it's right. Good Lock's playful customization style is explicitly OUT.</p>
+</div>
+
+<p class="note" style="margin-top:30px;">Tell me: <b>palette (A/B/C)</b> + <b>font pairing (1/2/3)</b> + <b>logo ok or change it</b> — and the frontend gets built on exactly that.</p>
+
+</body>
+</html>
