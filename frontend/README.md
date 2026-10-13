@@ -37,11 +37,18 @@ In the app: Settings page → Backend URL → your backend address. Saved on dev
 
 ## Push notifications
 
-`sw.js` has a `firebaseConfig` placeholder — paste your Firebase web config
-there (see `../env/frontend.firebase-config.example.js`).
+`firebase-config.js` holds the Firebase **web app config** and the public Web
+Push VAPID key used by the login flow and service worker. Add the Web Push
+certificate key in Firebase Console to `PERSONA_VAPID_KEY`; without it, sign-in
+continues normally and Settings explains what is missing. The private Firebase
+service-account JSON belongs only in the backend and must never be copied here.
+The service worker is registered centrally by `js/core/api.js` and provides the
+offline shell plus background FCM handling.
 
 ## Design
 
-Professional system style (Apple/Samsung): white `#FFFFFF`, ink `#1D1D1F`,
-grey `#6E6E73`/`#F5F5F7`, blue `#0071E3`, red `#FF3B30`, green `#34C759`.
-Flat, no gradients. Font: Inter throughout.
+Warm ivory surfaces, deep green ink, botanical line art, and restrained teal,
+clay, and ochre accents. Keep the interface calm and clear; avoid purple
+gradients and decorative emoji as navigation icons. Font: Inter with system
+fallbacks. The service worker registers from the shared API script and updates
+the app shell cache when the shell version changes.

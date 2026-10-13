@@ -1,5 +1,26 @@
 /* settings.js — profile view/update, backend URL, logout. */
 async function initSettings() {
+  const darkMode = document.getElementById('darkMode');
+  darkMode.checked = document.documentElement.dataset.theme === 'dark';
+  darkMode.onchange = () => Layout.setTheme(darkMode.checked ? 'dark' : 'light');
+  const pushStatus = document.getElementById('pushStatus');
+  const pushEnable = document.getElementById('pushEnable');
+  if (window.Notification?.permission === 'granted') pushStatus.textContent = 'Notifications are allowed. Enable or refresh this device registration.';
+  pushEnable.onclick = async () => {
+    pushEnable.disabled = true;
+    pushEnable.textContent = 'Enabling…';
+    try {
+      const registered = await Auth.registerPush();
+      pushStatus.textContent = registered ? 'This device is registered for reminder notifications.' : 'Notifications are blocked in this browser. Allow them in the site controls and try again.';
+      if (registered) UI.toast('Notifications enabled');
+    } catch (error) {
+      pushStatus.textContent = error.message;
+      UI.toast(error.message, 4500);
+    } finally {
+      pushEnable.disabled = false;
+      pushEnable.textContent = 'Enable notifications';
+    }
+  };
   try {
     const { user } = await API.get('/api/auth/me');
     document.getElementById('profileCard').innerHTML = `

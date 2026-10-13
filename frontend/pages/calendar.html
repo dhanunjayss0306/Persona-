@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f5f2e9">
 <title>Calendar · Persona</title>
 <link rel="manifest" href="../manifest.json">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
@@ -14,12 +15,24 @@
 </head>
 <body>
 <div id="app"><div class="page" id="page-calendar">
-<div class="pad"><div class="calHead"><button class="iconBtn" id="calPrev">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext">›</button></div><div class="calGrid" id="calGrid"></div><div id="calDay"></div></div>
+  <main class="pad calendarPage">
+    <section class="calendarIntro">
+      <div><span class="eyebrow">A LITTLE SPACE FOR WHAT MATTERS</span><h2>Plan a day that feels like yours.</h2><p>See what’s coming up, and make room for something new.</p></div>
+      <button class="btn primary calendarAddTop" id="calAdd"><span aria-hidden="true">+</span> Add to calendar</button>
+    </section>
+    <section class="calendarMonthCard" aria-label="Monthly calendar">
+      <header class="calHead"><button class="iconBtn" id="calPrev" aria-label="Previous month">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext" aria-label="Next month">›</button></header>
+      <div class="calGrid" id="calGrid"></div>
+      <div class="calendarLegend"><span><i class="legendDot"></i> Things planned</span><span><i class="legendToday"></i> Today</span></div>
+    </section>
+    <section id="calDay" class="calendarDayPanel" aria-live="polite"></section>
+  </main>
 </div></div>
 <script src="../js/core/api.js"></script>
 <script src="../js/core/layout.js"></script>
 <script src="../js/core/ui.js"></script>
 <script src="../js/core/auth.js"></script>
+<script src="../js/pages/reminders.js"></script>
 <script src="../js/pages/calendar.js"></script>
 <script>Layout.chrome('app', 'Calendar', 'calendar');</script>
 </body>

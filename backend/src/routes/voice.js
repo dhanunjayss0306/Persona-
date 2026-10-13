@@ -9,6 +9,7 @@
 //           returns the join URL (needs Google OAuth — see /api/voice/google/*).
 const express = require('express');
 const multer = require('multer');
+const jwt = require('jsonwebtoken');
 const supabase = require('../db');
 const { requireAuth } = require('../auth');
 const { parseToItems, stamp } = require('../services/nlp');
@@ -22,7 +23,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 // Always returns what it understood so the app can show a confirm screen.
 router.post('/parse', requireAuth, async (req, res) => {
   const { text, dry_run } = req.body || {};
-  if (!text) return res.status(400).json({ error: 'text required' });
+  if (typeof text !== 'string' || !text.trim()) return res.status(400).json({ error: 'text required' });
+  if (text.length > 4000) return res.status(413).json({ error: 'Voice notes must be under 4,000 characters' });
 
   const { date, items } = parseToItems(text);
   const created = [];
@@ -40,7 +42,8 @@ router.post('/parse', requireAuth, async (req, res) => {
         type: isWork ? 'nag' : 'once',
         due_at,
       }).select().single();
-      if (!error) created.push(data);
+      if (error) return res.status(500).json({ error: `Could not create "${it.title}": ${error.message}`, created: created.map((c) => ({ id: c.id, title: c.title })) });
+      created.push(data);
     }
   }
   res.json({
@@ -64,7 +67,8 @@ router.post('/profile', requireAuth, upload.single('sample'), async (req, res) =
     const { error } = await supabase.storage.from('voice-samples').upload(path, req.file.buffer, {
       contentType: req.file.mimetype, upsert: true,
     });
-    if (!error) sample_url = supabase.storage.from('voice-samples').getPublicUrl(path).data.publicUrl;
+    if (error) return res.status(500).json({ error: `Voice sample upload failed: ${error.message}` });
+    sample_url = supabase.storage.from('voice-samples').getPublicUrl(path).data.publicUrl;
   }
   const row = { user_id: req.user.id, wake_word: wake_word || 'Hey Persona' };
   if (sample_url) row.sample_url = sample_url;
@@ -116,50 +120,89 @@ router.get('/jiosaavn', requireAuth, (req, res) => {
 });
 
 // ---------- Google Meet via Calendar ----------
-const googleTokens = new Map(); // userId -> tokens; use DB/Redis in production.
+const googleTokens = new Map(); // Move to encrypted persistent storage before running multiple backend instances.
+const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-me';
 
-router.get('/google/login', requireAuth, (req, res) => {
-  if (!process.env.GOOGLE_CLIENT_ID) return res.status(500).json({ error: 'Google not configured (see .env)' });
-  const scope = encodeURIComponent('https://www.googleapis.com/auth/calendar.events');
-  res.redirect('https://accounts.google.com/o/oauth2/v2/auth?' +
-    `client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GOOGLE_REDIRECT_URI)}` +
-    `&response_type=code&scope=${scope}&access_type=offline&state=${req.user.id}`);
+router.get('/google/status', requireAuth, (req, res) => res.json({ connected: googleTokens.has(req.user.id) }));
+
+router.post('/google/login-url', requireAuth, (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+    return res.status(503).json({ error: 'Google Calendar is not configured on the backend.' });
+  }
+  const state = jwt.sign({ sub: req.user.id, purpose: 'google-calendar' }, jwtSecret, { expiresIn: '10m' });
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+    response_type: 'code',
+    scope: 'https://www.googleapis.com/auth/calendar.events',
+    access_type: 'offline',
+    prompt: 'consent',
+    state,
+  });
+  res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
 });
 
 router.get('/google/callback', async (req, res) => {
-  const { code, state } = req.query;
-  const r = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URI, grant_type: 'authorization_code',
-    }),
-  });
-  const tok = await r.json();
-  if (!tok.access_token) return res.status(400).send('Google login failed');
-  googleTokens.set(state, tok);
-  res.send('Google connected! You can close this tab and go back to Persona.');
+  let identity;
+  try { identity = jwt.verify(String(req.query.state || ''), jwtSecret); }
+  catch { return res.status(400).send('Google connection expired or invalid. Return to Persona and try again.'); }
+  if (identity.purpose !== 'google-calendar' || !identity.sub) return res.status(400).send('Invalid Google connection request.');
+  if (req.query.error) return res.status(400).send('Google connection was cancelled. You can close this tab.');
+  if (typeof req.query.code !== 'string' || !req.query.code) return res.status(400).send('Google did not return an authorization code.');
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: req.query.code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI, grant_type: 'authorization_code',
+      }),
+    });
+    const tokens = await response.json();
+    if (!response.ok || !tokens.access_token) return res.status(400).send('Google login failed. Return to Persona and try again.');
+    const previous = googleTokens.get(identity.sub);
+    googleTokens.set(identity.sub, { ...tokens, refresh_token: tokens.refresh_token || previous?.refresh_token, expires_at: Date.now() + Number(tokens.expires_in || 3600) * 1000 });
+    res.send('<!doctype html><meta name="viewport" content="width=device-width"><title>Connected · Persona</title><main style="font:16px system-ui;max-width:420px;margin:15vh auto;padding:24px;color:#172033"><h1>Google Calendar connected</h1><p>You can close this tab and return to Persona.</p></main>');
+  } catch { res.status(502).send('Could not reach Google. Return to Persona and try again.'); }
 });
 
 // POST /api/voice/meet {title?, minutes?} → creates event + Meet link.
 router.post('/meet', requireAuth, async (req, res) => {
-  const tok = googleTokens.get(req.user.id);
-  if (!tok) return res.status(400).json({ error: 'Connect Google first (GET /api/voice/google/login)' });
+  let tok = googleTokens.get(req.user.id);
+  if (!tok) return res.status(400).json({ error: 'Connect Google Calendar first.' });
+  if (tok.expires_at < Date.now() + 30000) {
+    if (!tok.refresh_token) { googleTokens.delete(req.user.id); return res.status(401).json({ error: 'Google session expired. Connect Google Calendar again.' }); }
+    try {
+      const refresh = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, refresh_token: tok.refresh_token, grant_type: 'refresh_token' }),
+      });
+      const next = await refresh.json();
+      if (!refresh.ok || !next.access_token) { googleTokens.delete(req.user.id); return res.status(401).json({ error: 'Google session expired. Connect Google Calendar again.' }); }
+      tok = { ...tok, ...next, refresh_token: tok.refresh_token, expires_at: Date.now() + Number(next.expires_in || 3600) * 1000 };
+      googleTokens.set(req.user.id, tok);
+    } catch { return res.status(502).json({ error: 'Could not refresh Google connection. Try again.' }); }
+  }
   const { title, minutes } = req.body || {};
+  const duration = minutes === undefined ? 30 : Number(minutes);
+  if (!Number.isFinite(duration) || duration < 1 || duration > 480) return res.status(400).json({ error: 'Meeting length must be between 1 and 480 minutes.' });
+  if (title !== undefined && (typeof title !== 'string' || title.length > 200)) return res.status(400).json({ error: 'Meeting title must be under 200 characters.' });
   const start = new Date(Date.now() + 5 * 60000);
-  const end = new Date(start.getTime() + (Number(minutes) || 30) * 60000);
-  const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${tok.access_token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      summary: title || 'Persona meeting',
-      start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() },
-      conferenceData: { createRequest: { requestId: 'persona-' + Date.now() } },
-    }),
-  });
-  const ev = await r.json();
-  if (!r.ok) return res.status(500).json({ error: 'Could not create meeting' });
+  const end = new Date(start.getTime() + duration * 60000);
+  let r, ev;
+  try {
+    r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tok.access_token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary: title || 'Persona meeting',
+        start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() },
+        conferenceData: { createRequest: { requestId: 'persona-' + Date.now() } },
+      }),
+    });
+    ev = await r.json();
+  } catch { return res.status(502).json({ error: 'Could not reach Google Calendar. Try again.' }); }
+  if (!r.ok || !ev.hangoutLink) return res.status(502).json({ error: 'Google Calendar could not create a Meet link.' });
   res.json({ meet_link: ev.hangoutLink, event: ev.htmlLink });
 });
 

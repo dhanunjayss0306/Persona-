@@ -9,7 +9,8 @@ const express = require('express');
 const cors = require('cors');
 
 const app = express();
-app.use(cors({ origin: (process.env.FRONTEND_URL || '').split(',').filter(Boolean) || '*' }));
+const frontendOrigins = (process.env.FRONTEND_URL || '').split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({ origin: frontendOrigins.length ? frontendOrigins : '*' }));
 app.use(express.json({ limit: '2mb' }));
 
 // Health check — visit /health to see if the server is alive.

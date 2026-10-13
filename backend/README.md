@@ -60,8 +60,11 @@ status `done` → scheduler goes quiet. Only a proof row stops it.
 `POST /api/cart/:id/check` now) → price ≤ target → a one-time reminder is
 created → you get notified through the normal channel.
 
-**Meet link:** connect Google once (`GET /api/voice/google/login`), then
-`POST /api/voice/meet` returns a `meet_link`.
+**Meet link:** open Voice and choose **Connect Google Calendar**. The app uses
+`POST /api/voice/google/login-url` for the signed OAuth flow; then
+`POST /api/voice/meet` returns a `meet_link`. Google OAuth settings must be
+configured in the backend environment. Tokens currently live in memory and
+will need persistent encrypted storage for multi-instance or restart-safe use.
 
 **Spotify playlist:** connect once (`GET /api/playlists/spotify/login`), then
 `POST /api/playlists` with `{name, songs[]}` creates it on your account.

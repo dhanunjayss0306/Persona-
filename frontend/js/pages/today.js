@@ -7,7 +7,8 @@ async function initToday() {
   const box = document.getElementById('todayList');
   box.innerHTML = '<p class="muted">Loading…</p>';
   try {
-    const t = new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const { days } = await API.get(`/api/calendar?from=${t}&to=${t}`);
     const d = days[t];
     if (!d || (!d.reminders.length && !d.plan_blocks.length && !d.events.length)) {

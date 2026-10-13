@@ -7,12 +7,14 @@
 // (everything else keeps working).
 const admin = require('firebase-admin');
 const fs = require('fs');
+const nodePath = require('path');
 const supabase = require('../db');
 
 let ready = false;
 (function init() {
   try {
-    const path = process.env.FCM_SERVICE_ACCOUNT_PATH;
+    const raw = process.env.FCM_SERVICE_ACCOUNT_PATH;
+    const path = raw ? nodePath.resolve(raw) : null;
     if (path && fs.existsSync(path)) {
       admin.initializeApp({ credential: admin.credential.cert(require(path)) });
       ready = true;

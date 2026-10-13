@@ -124,6 +124,7 @@ router.post('/devices', requireAuth, async (req, res) => {
   const { error } = await supabase.from('devices')
     .upsert({ user_id: req.user.id, fcm_token, label: label || null }, { onConflict: 'fcm_token' });
   if (error) return res.status(500).json({ error: error.message });
+  console.log('[push] device registered');
   res.json({ ok: true });
 });
 

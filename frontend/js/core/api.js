@@ -24,3 +24,20 @@ const API = {
   patch: (p, body) => API.call(p, { method: 'PATCH', body }),
   del: (p) => API.call(p, { method: 'DELETE' }),
 };
+
+// Register the app shell on secure origins so installed builds receive updates
+// and can open their core screens offline. Skip gracefully on plain HTTP hosts.
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  const scriptUrl = document.currentScript?.src || location.href;
+  navigator.serviceWorker.register(new URL('../../sw.js', scriptUrl), { updateViaCache: 'none' }).then((registration) => {
+    registration.update().catch(() => {});
+    if (navigator.serviceWorker.controller) {
+      let hasReloadedForUpdate = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (hasReloadedForUpdate) return;
+        hasReloadedForUpdate = true;
+        location.reload();
+      });
+    }
+  }).catch(() => {});
+}

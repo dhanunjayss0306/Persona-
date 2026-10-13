@@ -91,8 +91,12 @@ router.post('/:id/check', requireAuth, async (req, res) => {
 
 // GET /api/cart/:id/history — price chart data.
 router.get('/:id/history', requireAuth, async (req, res) => {
+  const { data: item, error: itemError } = await supabase.from('cart_items').select('id')
+    .eq('id', req.params.id).eq('user_id', req.user.id).maybeSingle();
+  if (itemError) return res.status(500).json({ error: itemError.message });
+  if (!item) return res.status(404).json({ error: 'Not found' });
   const { data } = await supabase.from('price_history').select('price,checked_at')
-    .eq('cart_item_id', req.params.id).order('checked_at');
+    .eq('cart_item_id', item.id).order('checked_at');
   res.json(data || []);
 });
 

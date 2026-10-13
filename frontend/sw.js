@@ -1,28 +1,36 @@
-/* sw.js — Persona service worker: app-shell cache + FCM push.
-   FCM needs your Firebase web config — paste it into firebaseConfig below
-   (Firebase Console > Project settings > Your apps > SDK setup). */
-const CACHE = 'persona-v2';
+/* sw.js — Persona service worker: app-shell cache + FCM push. */
+importScripts('./firebase-config.js');
+const firebaseConfig = self.PERSONA_FIREBASE_CONFIG;
+const CACHE = 'persona-v7';
 const SHELL = ['./', './index.html', './manifest.json',
   './css/tokens.css', './css/components.css', './css/journal.css',
-  './assets/logo-mark.png',
-  './js/core/api.js', './js/core/layout.js', './js/core/ui.js', './js/core/auth.js',
-  './pages/today.html', './pages/reminders.html', './pages/calendar.html', './pages/ai.html',
-  './js/pages/today.js', './js/pages/reminders.js', './js/pages/calendar.js', './js/pages/ai.js'];
+  './assets/logo-mark.png', './assets/ambient-linework.svg', './assets/ambient-botanical.svg', './firebase-config.js',
+  './js/core/api.js', './js/core/layout.js', './js/core/ui.js', './js/core/auth.js', './js/pages/settings.js',
+  './pages/today.html', './pages/reminders.html', './pages/calendar.html', './pages/ai.html', './pages/voice.html',
+  './pages/settings.html', './pages/cart.html', './pages/journal.html',
+  './js/pages/today.js', './js/pages/reminders.js', './js/pages/calendar.js', './js/pages/ai.js', './js/pages/voice.js',
+  './js/pages/cart.js', './js/pages/journal.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
-self.addEventListener('activate', (e) => { e.waitUntil(self.clients.claim()); });
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then((keys) => Promise.all(
+    keys.filter((key) => key.startsWith('persona-') && key !== CACHE).map((key) => caches.delete(key))
+  )).then(() => self.clients.claim()));
+});
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+  const isAppCode = e.request.mode === 'navigate' || /\.(html|css|js|json)$/.test(new URL(e.request.url).pathname);
+  if (isAppCode) {
+    e.respondWith(fetch(e.request).then(async (response) => {
+      if (response.ok) await (await caches.open(CACHE)).put(e.request, response.clone());
+      return response;
+    }).catch(async () => (await caches.open(CACHE)).match(e.request)));
+    return;
+  }
+  e.respondWith(caches.open(CACHE).then((cache) => cache.match(e.request).then((hit) => hit || fetch(e.request))));
 });
-
-// ---- FCM push (fill firebaseConfig to enable) ----
-const firebaseConfig = {
-  apiKey: "PASTE_ME", authDomain: "PASTE_ME", projectId: "PASTE_ME",
-  messagingSenderId: "PASTE_ME", appId: "PASTE_ME",
-};
 let messaging = null;
 try {
   if (firebaseConfig.apiKey !== 'PASTE_ME') {

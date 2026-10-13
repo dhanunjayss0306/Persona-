@@ -14,8 +14,11 @@
 </head>
 <body>
 <div id="app"><div class="page" id="page-settings">
-<div class="pad"><h2 class="display">Settings</h2><div class="card" id="profileCard"></div><div class="card"><h3>Backend</h3><div class="row"><input id="apiBase" placeholder="https://your-backend/api"><button class="btn" id="apiSave">Save</button></div><p class="muted sm">Default: this device (localhost:3001). Set your Oracle/Render URL here.</p></div><button class="btn danger" id="logoutBtn">Log out</button></div>
+<div class="pad"><h2 class="display">Settings</h2><section class="card appearanceCard"><h3>Appearance</h3><p class="muted sm">Choose a comfortable look. Your choice stays on this device.</p><label class="switchRow" for="darkMode"><span>Dark appearance</span><input id="darkMode" type="checkbox"><span class="switch" aria-hidden="true"></span></label></section><section class="card"><h3>Notifications</h3><p class="muted sm" id="pushStatus">Get strict reminders on this device. Allow notifications when your browser asks.</p><button class="btn primary" id="pushEnable" style="margin-top:12px">Enable notifications</button></section><div class="card" id="profileCard"></div><div class="card"><h3>Backend</h3><div class="row"><input id="apiBase" placeholder="https://your-backend/api"><button class="btn" id="apiSave">Save</button></div><p class="muted sm">Default: this device (localhost:3001). Set your Oracle/Render URL here.</p></div><button class="btn danger" id="logoutBtn">Log out</button></div>
 </div></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<script src="../firebase-config.js"></script>
 <script src="../js/core/api.js"></script>
 <script src="../js/core/layout.js"></script>
 <script src="../js/core/ui.js"></script>

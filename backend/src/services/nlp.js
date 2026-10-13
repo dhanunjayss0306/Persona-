@@ -44,10 +44,13 @@ function detectDate(text) {
     const d = new Date(today); d.setDate(d.getDate() + diff);
     return isoDay(d);
   }
-  const md = text.match(/\b(\d{1,2})(st|nd|rd|th)?\b/);
+  // Only interpret a bare number as a day when it is not part of a spoken time.
+  // Previously "meeting at 8" was incorrectly scheduled on the 8th of the month.
+  const dateText = text.replace(/\b(?:at|from|to)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?/g, ' ');
+  const md = dateText.match(/\b(\d{1,2})(st|nd|rd|th)?\s*(?:of\s+)?(?:january|february|march|april|may|june|july|august|september|october|november|december)\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(st|nd|rd|th)?\b|\b(?:on\s+)?the\s+(\d{1,2})(st|nd|rd|th)\b/i);
   if (md) {
     const d = new Date(today);
-    d.setDate(Number(md[1]));
+    d.setDate(Number(md[1] || md[3] || md[5]));
     if (isoDay(d) < isoDay(today)) d.setMonth(d.getMonth() + 1);
     return isoDay(d);
   }
@@ -102,6 +105,7 @@ function parseToItems(text) {
     const title = clause.replace(/at\s+\d{1,2}(?::\d{2})?\s*(am|pm)?/, '')
       .replace(/from\s+\d{1,2}(?::\d{2})?\s*(am|pm)?\s*to\s+\d{1,2}(?::\d{2})?\s*(am|pm)?/, '')
       .replace(/\b(today|tomorrow|tonight|day after tomorrow)\b/, '')
+      .replace(/\b(?:on\s+)?the\s+\d{1,2}(?:st|nd|rd|th)\b/, '')
       .replace(/\s+/g, ' ').trim() || clause;
     return { title, kind, start, end };
   });

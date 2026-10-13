@@ -1,10 +1,35 @@
 /* auth.js — login, signup, onboarding, session. No page layout here. */
+const PUSH_CONFIG = window.PERSONA_FIREBASE_CONFIG || {};
+const VAPID_KEY = window.PERSONA_VAPID_KEY || 'PASTE_ME';
 const Auth = {
   user() { try { return JSON.parse(localStorage.getItem('persona_user')); } catch (e) { return null; } },
   save(r, next) {
     localStorage.setItem('persona_token', r.token);
     localStorage.setItem('persona_user', JSON.stringify(r.user));
-    location.href = next;
+    const ready = PUSH_CONFIG.apiKey && PUSH_CONFIG.apiKey !== 'PASTE_ME' && VAPID_KEY !== 'PASTE_ME';
+    if (!ready) { location.href = next; return; }
+    let timeout;
+    Promise.race([this.registerPush(), new Promise((resolve) => { timeout = setTimeout(resolve, 8000); })])
+      .catch((error) => console.warn('[push] skipped:', error.message))
+      .finally(() => { clearTimeout(timeout); location.href = next; });
+  },
+  async registerPush() {
+    if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+      throw new Error('Push notifications need a supported browser on HTTPS or localhost.');
+    }
+    if (!PUSH_CONFIG.apiKey || PUSH_CONFIG.apiKey === 'PASTE_ME' || !VAPID_KEY || VAPID_KEY === 'PASTE_ME') {
+      throw new Error('Add the Firebase Web Push certificate key to frontend/firebase-config.js.');
+    }
+    if (!window.firebase?.messaging) throw new Error('Firebase Messaging did not load. Check your connection and reload.');
+    if (Notification.permission === 'default') await Notification.requestPermission();
+    if (Notification.permission !== 'granted') return false;
+    if (!firebase.apps.length) firebase.initializeApp(PUSH_CONFIG);
+    const registration = await navigator.serviceWorker.ready;
+    const token = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
+    if (!token) return false;
+    await API.post('/api/auth/devices', { fcm_token: token, label: 'web' });
+    console.info('[push] device registered');
+    return true;
   },
   logout() {
     localStorage.removeItem('persona_token');
@@ -21,7 +46,6 @@ const Auth = {
         ${UI.field('Email or phone', '<input id="liLogin" placeholder="you@mail.com / +91…">')}
         ${UI.field('Password', '<input id="liPass" type="password" placeholder="••••••••">')}
         <button class="btn primary" id="liGo" style="width:100%;margin-top:6px">Log in</button>
-        <button class="btn" id="liGoogle" style="width:100%;margin-top:10px">G &nbsp;Sign in with Google</button>
         <p class="center" style="margin-top:14px"><a class="linkBtn" href="pages/signup.html">Create account</a></p>
       </div>`;
     const v = (id) => document.getElementById(id).value.trim();
@@ -31,7 +55,6 @@ const Auth = {
         Auth.save(r, 'pages/today.html');
       } catch (e) { UI.toast(e.message); }
     };
-    document.getElementById('liGoogle').onclick = () => UI.toast('Add your Google Client ID to enable this');
   },
   /* ---- pages/signup.html ---- */
   initSignup() {

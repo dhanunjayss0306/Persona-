@@ -15,3 +15,35 @@
 .theme-sunset { --tb:#1D1D1F; } .theme-ocean { --tb:#1F3A5F; }
 .theme-forest { --tb:#2F5D34; } .theme-mono { --tb:#4A4A4E; }
 
+/* An open, cloth-bound sketchbook with a botanical stamp and warm paper. */
+.journalLead { margin:-10px 0 0; color:var(--muted); }
+.bookStage { perspective:1500px; padding:28px 0 24px; }
+.book3d { width:min(100%,680px); height:clamp(300px,54vw,390px); transform:rotateY(-4deg) rotateX(1deg); }
+.bookStage:hover .book3d { transform:rotateY(-1deg) rotateX(0); }
+.bookCover,.bookPage { top:0; bottom:0; height:100%; border-radius:0; }
+.bookCover { left:0; right:auto; width:50%; z-index:2; overflow:hidden; gap:13px; border-radius:14px 0 0 14px; transform:translateZ(3px); background:var(--tb,#385748); box-shadow:inset -1px 0 rgba(255,255,255,.16),-12px 18px 34px rgba(0,0,0,.18); }
+.bookCover::before { left:13px; right:13px; top:13px; bottom:13px; width:auto; border:1px solid rgba(239,224,187,.26); border-radius:8px 0 0 8px; background:transparent; }
+.bookMark { width:62px; height:62px; fill:none; stroke:#d4c69f; stroke-width:1.45; stroke-linecap:round; stroke-linejoin:round; opacity:.95; }
+.bookTitle { font-family:Georgia,'Times New Roman',serif; font-size:clamp(26px,5vw,39px); font-weight:500; letter-spacing:.015em; }
+.bookSub { font-size:10px; letter-spacing:.14em; color:#e2d6bb; opacity:.86; }
+.coverRule { width:34px; height:1px; background:#c7b58b; opacity:.65; }
+.bookPage { left:50%; right:0; width:50%; z-index:1; padding:clamp(20px,4vw,38px) clamp(16px,4vw,34px); border:0; border-radius:0 14px 14px 0; transform:translateZ(2px); background-color:#f6f1e6; background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 31px,rgba(76,106,84,.10) 32px); box-shadow:12px 18px 34px rgba(0,0,0,.13); color:#34372f; }
+.bookPage::before { content:''; position:absolute; top:0; bottom:0; left:0; width:1px; background:rgba(82,78,61,.16); }
+.bookPage h4 { margin:12px 0 12px; font-family:Georgia,'Times New Roman',serif; font-size:24px; font-weight:500; line-height:1.2; }
+.bookPage p:not(.mood) { line-height:1.85; white-space:pre-wrap; }
+.bookPage .mood { color:#6d806f; font-size:10px; letter-spacing:.12em; }
+html[data-theme="dark"] .bookPage .muted { color:#70746a; }
+.bookNav { gap:8px; }
+.journalTools { max-width:440px; margin:0 auto; }
+.journalTools select { min-width:0; }
+.theme-sunset { --tb:#40594c; }
+.theme-ocean { --tb:#3e5d62; }
+.theme-forest { --tb:#3f604a; }
+.theme-mono { --tb:#655d4c; }
+.book3d.turn-next .bookPage { animation:pageTurnNext .46s var(--spring); }
+.book3d.turn-prev .bookPage { animation:pageTurnPrev .46s var(--spring); }
+@keyframes pageTurnNext { 0% { transform:translateZ(2px) rotateY(0); } 45% { transform:translateZ(18px) rotateY(-8deg); box-shadow:0 14px 28px rgba(0,0,0,.22); } 100% { transform:translateZ(2px) rotateY(0); } }
+@keyframes pageTurnPrev { 0% { transform:translateZ(2px) rotateY(0); } 45% { transform:translateZ(18px) rotateY(8deg); box-shadow:0 14px 28px rgba(0,0,0,.22); } 100% { transform:translateZ(2px) rotateY(0); } }
+@media(max-width:480px) { .book3d { height:320px; transform:none; } .bookStage:hover .book3d { transform:none; } .bookMark { width:49px; height:49px; } .bookPage { padding:20px 13px; font-size:12px; } .bookPage h4 { font-size:20px; } .bookSub { font-size:9px; } .journalTools { gap:7px; } }
+@media(prefers-reduced-motion:reduce) { .book3d,.bookStage:hover .book3d { transition:none; transform:none; } .book3d.turn-next .bookPage,.book3d.turn-prev .bookPage { animation:none; } }
+

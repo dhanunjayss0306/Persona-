@@ -7,8 +7,8 @@ async function initJournal() {
   Journal.idx = Math.max(0, Journal.entries.length - 1);
   document.getElementById('bookCount').textContent = Journal.entries.length + ' entries';
   Journal.show();
-  document.getElementById('bookPrev').onclick = () => { if (Journal.idx > 0) { Journal.idx--; Journal.show(); } };
-  document.getElementById('bookNext').onclick = () => { if (Journal.idx < Journal.entries.length - 1) { Journal.idx++; Journal.show(); } };
+  document.getElementById('bookPrev').onclick = () => Journal.turn(-1);
+  document.getElementById('bookNext').onclick = () => Journal.turn(1);
   document.getElementById('bookWrite').onclick = Journal.writeSheet;
   document.getElementById('bookTheme').onchange = (e) => {
     document.querySelector('.bookCover').className = 'bookCover theme-' + e.target.value;
@@ -26,11 +26,20 @@ async function initJournal() {
     document.getElementById('revLink').onclick = async () => { await API.del(`/api/journal/${e.id}/share`); UI.closeSheet(); UI.toast('Link revoked'); };
   };
 };
+Journal.turn = function (direction) {
+  const next = Journal.idx + direction;
+  if (next < 0 || next >= Journal.entries.length || Journal.turning) return;
+  const book = document.getElementById('book3d');
+  Journal.turning = true;
+  book.classList.add(direction > 0 ? 'turn-next' : 'turn-prev');
+  setTimeout(() => { Journal.idx = next; Journal.show(); }, 210);
+  setTimeout(() => { book.classList.remove('turn-next', 'turn-prev'); Journal.turning = false; }, 470);
+};
 Journal.show = function () {
   const p = document.getElementById('bookPage');
   const e = Journal.entries[Journal.idx];
   if (!e) { p.innerHTML = '<h4>Empty book</h4><p class="muted">Tap “Write today” to begin.</p>'; return; }
-  p.innerHTML = `<div class="mood">${UI.esc(e.mood || '')} · ${UI.d(e.entry_date)}</div><h4>${UI.esc(e.title || 'Untitled')}</h4><p>${UI.esc(e.body)}</p>`;
+  p.innerHTML = `<div class="mood">${UI.esc(e.mood || 'A NOTE TO SELF')} · ${UI.d(e.entry_date)}</div><h4>${UI.esc(e.title || 'Untitled')}</h4><p>${UI.esc(e.body)}</p>`;
 };
 Journal.writeSheet = function () {
   const t = new Date().toISOString().slice(0, 10);
