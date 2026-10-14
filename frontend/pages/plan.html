@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#171c19">
+<title>Plan · Persona</title>
+<link rel="manifest" href="../manifest.json">
+<link rel="apple-touch-icon" href="../icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/components.css">
+</head>
+<body>
+<div id="app">
+  <div class="planHub" id="planHub">
+    <div class="planHubSwitch" role="tablist" aria-label="Planning views">
+      <button type="button" role="tab" data-view="calendar" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span>Calendar</span></button>
+      <button type="button" role="tab" data-view="reminders" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Reminders</span></button>
+      <button type="button" role="tab" data-view="planner" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v17H5zM8 8h8M8 12h8M8 16h5"/></svg><span>Study plan</span></button>
+    </div>
+    <p class="planHubNote">Calendar activities stay here. Add a reminder when you need an alert.</p>
+
+    <section class="planPane" id="page-calendar" role="tabpanel">
+      <main class="pad calendarPage">
+        <section class="calendarIntro">
+          <div><span class="eyebrow">A LITTLE SPACE FOR WHAT MATTERS</span><h2>Plan a day that feels like yours.</h2><p>See what’s coming up, and make room for something new.</p></div>
+          <button class="btn primary calendarAddTop" id="calAdd"><span aria-hidden="true">+</span> Add to calendar</button>
+        </section>
+        <section class="calendarMonthCard" aria-label="Monthly calendar">
+          <header class="calHead"><button class="iconBtn" id="calPrev" aria-label="Previous month">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext" aria-label="Next month">›</button></header>
+          <div class="calGrid" id="calGrid"></div>
+          <div class="calendarLegend"><span><i class="legendDot"></i> Things planned</span><span><i class="legendToday"></i> Today</span></div>
+        </section>
+        <section id="calDay" class="calendarDayPanel" aria-live="polite"></section>
+      </main>
+    </section>
+
+    <section class="planPane" id="page-reminders" role="tabpanel" hidden>
+      <main class="pad planInnerPage">
+        <header class="planPaneHeading"><span class="eyebrow">THINGS THAT NEED A NUDGE</span><h2>Reminders</h2><p>Set your own reminders here. Study reminders can be added automatically from a plan.</p></header>
+        <div class="seg" id="remSeg"><button data-f="all" class="on">All</button><button data-f="once">Once</button><button data-f="nag">Strict</button></div>
+        <div id="remList"></div><button class="fab" id="remAdd" aria-label="Add reminder">+</button>
+      </main>
+    </section>
+
+    <section class="planPane" id="page-planner" role="tabpanel" hidden>
+      <main class="pad planInnerPage">
+        <header class="planPaneHeading"><span class="eyebrow">MAKE PROGRESS A LITTLE AT A TIME</span><h2>Study plan</h2><p>Add your topics and exam dates. Persona will map out study days and remind you at the time you choose.</p></header>
+        <div id="planList"></div><button class="fab" id="planAdd" aria-label="Create study plan">+</button>
+      </main>
+    </section>
+  </div>
+</div>
+<script src="../js/core/api.js"></script>
+<script src="../js/core/layout.js"></script>
+<script src="../js/core/ui.js"></script>
+<script src="../js/core/auth.js"></script>
+<script src="../js/pages/reminders.js"></script>
+<script src="../js/pages/calendar.js"></script>
+<script src="../js/pages/planner.js"></script>
+<script src="../js/pages/planhub.js"></script>
+<script>Layout.chrome('app', 'Plan', 'plan');</script>
+</body>
+</html>

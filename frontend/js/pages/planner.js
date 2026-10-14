@@ -25,7 +25,10 @@ async function initPlanner() {
     box.querySelectorAll('[data-delplan]').forEach((b) => b.onclick = () =>
       UI.confirmSheet('Delete plan?', 'All its days go too.', async () => { await API.del(`/api/planner/${b.dataset.delplan}`); initPlanner(); }));
     box.querySelectorAll('[data-days]').forEach((b) => b.onclick = () => Plan.days(b.dataset.days, plans));
-  } catch (e) { box.innerHTML = '<p class="muted">Backend unreachable.</p>'; }
+  } catch (e) {
+    box.innerHTML = `<div class="card"><b>Could not load planner</b><p class="muted">${UI.esc(e?.message || 'Request failed')}</p><button class="btn" id="planRetry">Try again</button></div>`;
+    document.getElementById('planRetry').onclick = () => initPlanner();
+  }
 };
 const Plan = {
   sheet() {
@@ -35,6 +38,7 @@ const Plan = {
       ${UI.field('Title', '<input id="plTitle" placeholder="Semester exams">')}
       <div class="row">${UI.field('From', `<input id="plFrom" type="date" value="${t}">`)}${UI.field('To', `<input id="plTo" type="date" value="${e}">`)}</div>
       ${UI.field('Hours per day', '<input id="plHrs" type="number" value="4" min="1" max="16">')}
+      ${UI.field('Daily study reminder', '<input id="plTime" type="time" value="17:00">')}
       ${UI.field('Topics (one per line)', '<textarea id="plTopics" placeholder="Java OOP\nDBMS joins\nOS scheduling"></textarea>')}
       ${UI.field('Leisure', '<input id="plLei" placeholder="Movies, games…">')}
       <p class="kicker">Fixed events first? Add exams below, then build.</p>
@@ -50,13 +54,24 @@ const Plan = {
       const topics = document.getElementById('plTopics').value.split('\n').map((s) => s.trim()).filter(Boolean);
       if (!topics.length) return UI.toast('Add at least one topic');
       try {
+        const start = document.getElementById('plFrom').value, end = document.getElementById('plTo').value;
+        const studyTime = document.getElementById('plTime').value;
+        if (!start || !end || !studyTime || end < start) return UI.toast('Choose a valid date range and reminder time');
+        const studyReminders = [];
+        const cursor = new Date(`${start}T12:00:00`), last = new Date(`${end}T12:00:00`);
+        while (cursor <= last) {
+          const day = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+          const due = new Date(`${day}T${studyTime}`);
+          if (due > new Date()) studyReminders.push({ due_at: due.toISOString() });
+          cursor.setDate(cursor.getDate() + 1);
+        }
         const r = await API.post('/api/planner/build', {
           title: document.getElementById('plTitle').value.trim() || 'My plan',
-          start_date: document.getElementById('plFrom').value, end_date: document.getElementById('plTo').value,
+          start_date: start, end_date: end,
           hours_per_day: Number(document.getElementById('plHrs').value),
-          topics, leisure: document.getElementById('plLei').value.trim(),
+          topics, leisure: document.getElementById('plLei').value.trim(), study_reminders: studyReminders,
         });
-        UI.closeSheet(); UI.toast(`Planned ${r.days} days`); initPlanner();
+        UI.closeSheet(); UI.toast(`Planned ${r.days} days · ${r.reminders || 0} study reminders set`); initPlanner();
       } catch (e) { UI.toast(e.message); }
     };
   },
@@ -75,4 +90,4 @@ const Plan = {
   },
 };
 
-document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('page-planner')) initPlanner(); });
+document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('page-planner') && !document.getElementById('planHub')) initPlanner(); });

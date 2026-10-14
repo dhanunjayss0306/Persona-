@@ -41,9 +41,13 @@ function buildDays({ start, end, hoursPerDay, topics, leisure, events }) {
 
 // POST /api/planner/build {title, start_date, end_date, hours_per_day, topics[], leisure?}
 router.post('/build', requireAuth, async (req, res) => {
-  const { title, start_date, end_date, hours_per_day, topics, leisure } = req.body || {};
+  const { title, start_date, end_date, hours_per_day, topics, leisure, study_reminders } = req.body || {};
   if (!title || !start_date || !end_date || !hours_per_day || !topics?.length) {
     return res.status(400).json({ error: 'title, start_date, end_date, hours_per_day, topics[] required' });
+  }
+  if (study_reminders !== undefined && (!Array.isArray(study_reminders) || study_reminders.length > 120 ||
+      study_reminders.some((r) => !r || typeof r.due_at !== 'string' || Number.isNaN(Date.parse(r.due_at))))) {
+    return res.status(400).json({ error: 'Study reminders must contain valid due_at dates (up to 120).' });
   }
   const { data: events } = await supabase.from('fixed_events').select('title,event_date')
     .eq('user_id', req.user.id).gte('event_date', start_date).lte('event_date', end_date);
@@ -58,7 +62,17 @@ router.post('/build', requireAuth, async (req, res) => {
   const { error: dErr } = await supabase.from('plan_days').insert(rows);
   if (dErr) return res.status(500).json({ error: dErr.message });
 
-  res.status(201).json({ plan, days: days.length });
+  if (study_reminders?.length) {
+    const reminders = study_reminders.map(({ due_at }) => ({
+      user_id: req.user.id, title: `${title}: study session`,
+      details: 'Plan assistant: scheduled from your study plan.',
+      type: 'once', due_at, proof_required: false,
+    }));
+    const { error: reminderError } = await supabase.from('reminders').insert(reminders);
+    if (reminderError) return res.status(500).json({ error: 'Plan created, but study reminders could not be saved.' });
+  }
+
+  res.status(201).json({ plan, days: days.length, reminders: study_reminders?.length || 0 });
 });
 
 // GET /api/planner — my plans with their days.

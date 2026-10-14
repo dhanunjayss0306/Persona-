@@ -3,11 +3,12 @@ const Reminders = {
   filter: 'all',
   row(r) {
     const type = r.type === 'nag' ? '<span class="badge nag">strict</span>' : '<span class="badge">once</span>';
+    const source = r.details?.startsWith('Plan assistant:') ? '<span class="badge">study plan</span>' : '';
     const done = r.status === 'done' ? ' done' : '';
     return `<div class="rem ${r.type}${done}" data-id="${r.id}">
       <div class="dot"></div>
       <div class="t"><b>${UI.esc(r.title)}</b><span>${UI.dt(r.due_at)} · ${r.status}</span></div>
-      ${type}</div>`;
+      ${source || type}</div>`;
   },
   bindRows(root) {
     root.querySelectorAll('.rem[data-id]').forEach((el) => {
@@ -22,14 +23,19 @@ const Reminders = {
       const rows = all.filter((r) => this.filter === 'all' || r.type === this.filter);
       box.innerHTML = rows.length ? rows.map((r) => this.row(r)).join('') : '<p class="muted center" style="margin-top:30px">No reminders. Tap + to add one.</p>';
       this.bindRows(box);
-    } catch (e) { box.innerHTML = '<p class="muted">Backend unreachable.</p>'; }
+    } catch (e) {
+      const message = e?.message || 'Request failed';
+      box.innerHTML = `<section class="card remLoadError" role="alert"><b>Could not load reminders</b><p class="muted">${UI.esc(message)}</p><button class="btn" id="remRetry" type="button">Try again</button></section>`;
+      document.getElementById('remRetry').onclick = () => this.render();
+    }
   },
   createSheet() {
     const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     UI.sheet(`<h3 style="font-family:var(--font-d);font-size:22px;margin-bottom:12px">New reminder</h3>
       ${UI.field('Title', '<input id="nrTitle" placeholder="Submit assignment">')}
       ${UI.field('Type', `<div class="seg" id="nrType"><button data-t="once" class="on">Once</button><button data-t="nag">Strict (nags till proof)</button></div>`)}
-      ${UI.field('When', `<input id="nrDue" type="datetime-local" value="${now.toISOString().slice(0, 16)}">`)}
+      <div class="row reminderWhen"><div>${UI.field('Date', `<input id="nrDate" type="date" value="${now.toISOString().slice(0, 10)}">`)}</div><div>${UI.field('Time', `<input id="nrTime" type="time" value="${now.toISOString().slice(11, 16)}">`)}</div></div>
+      <p class="muted sm reminderClockHint">Choose a time using your device’s clock picker.</p>
       ${UI.field('Details (optional)', '<input id="nrDet" placeholder="…">')}
       <button class="btn primary" id="nrGo" style="width:100%">Set reminder</button>`);
     let type = 'once';
@@ -39,10 +45,13 @@ const Reminders = {
     });
     document.getElementById('nrGo').onclick = async () => {
       try {
+        const date = document.getElementById('nrDate').value, time = document.getElementById('nrTime').value;
+        if (!date || !time) return UI.toast('Choose a date and time');
+        const due = new Date(`${date}T${time}`);
         await API.post('/api/reminders', {
           title: document.getElementById('nrTitle').value.trim(),
           details: document.getElementById('nrDet').value.trim(),
-          type, due_at: new Date(document.getElementById('nrDue').value).toISOString(),
+          type, due_at: due.toISOString(),
         });
         UI.closeSheet(); UI.toast('Reminder set'); this.render();
       } catch (e) { UI.toast(e.message); }
@@ -84,17 +93,21 @@ const Reminders = {
       await API.del(`/api/reminders/${id}`); this.render();
     });
     has('rEdit').onclick = () => {
+      const editDate = new Date(r.due_at);
+      editDate.setMinutes(editDate.getMinutes() - editDate.getTimezoneOffset());
       UI.sheet(`<h3 style="font-family:var(--font-d);font-size:22px;margin-bottom:12px">Edit reminder</h3>
         ${UI.field('Title', `<input id="erTitle" value="${UI.esc(r.title)}">`)}
-        ${UI.field('When', `<input id="erDue" type="datetime-local" value="${new Date(r.due_at).toISOString().slice(0, 16)}">`)}
+        <div class="row reminderWhen"><div>${UI.field('Date', `<input id="erDate" type="date" value="${editDate.toISOString().slice(0, 10)}">`)}</div><div>${UI.field('Time', `<input id="erTime" type="time" value="${editDate.toISOString().slice(11, 16)}">`)}</div></div>
         ${UI.field('Details', `<input id="erDet" value="${UI.esc(r.details || '')}">`)}
         <button class="btn primary" id="erGo" style="width:100%">Save</button>`);
       document.getElementById('erGo').onclick = async () => {
         try {
+          const date = document.getElementById('erDate').value, time = document.getElementById('erTime').value;
+          if (!date || !time) return UI.toast('Choose a date and time');
           await API.patch(`/api/reminders/${id}`, {
             title: document.getElementById('erTitle').value.trim(),
             details: document.getElementById('erDet').value.trim(),
-            due_at: new Date(document.getElementById('erDue').value).toISOString(),
+            due_at: new Date(`${date}T${time}`).toISOString(),
           });
           UI.closeSheet(); UI.toast('Updated'); this.render();
         } catch (e) { UI.toast(e.message); }
@@ -111,4 +124,4 @@ function initReminders() {
   Reminders.render();
 };
 
-document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('page-reminders')) initReminders(); });
+document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('page-reminders') && !document.getElementById('planHub')) initReminders(); });

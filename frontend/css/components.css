@@ -199,8 +199,10 @@ label.switchRow { display:flex; align-items:center; justify-content:space-betwee
 @media(max-width:650px) { .voicePage { padding:24px 17px 120px; } .voiceIntro .display { font-size:32px; } .voiceGrid { grid-template-columns:1fr; } .contactsCard { grid-column:auto; } .contactList { grid-template-columns:1fr; } #tabbar { width:calc(100% - 24px); justify-content:space-around; } #tabbar button { min-width:0; flex:1; padding:7px 4px; } }
 
 /* Warm, illustrated palette shared by every screen. */
-#appbar { background:rgba(248,246,239,.94); }
-#tabbar button.on { background:#e5efea; }
+#appbar { background:rgba(249,247,238,.97); }
+#tabbar { background:rgba(249,247,238,.97); border-color:rgba(32,49,47,.2); box-shadow:0 12px 36px rgba(32,49,47,.2); }
+#tabbar button.on { background:#d4e3d8; color:#1e5b4e; }
+.brandHome { border-radius:12px; box-shadow:0 0 0 2px rgba(32,49,47,.1); }
 .voiceCapture { border-color:rgba(40,110,101,.15); background:#fbf8f0; box-shadow:0 14px 34px rgba(40,57,48,.08); }
 .voiceOrbRing { border-color:rgba(40,110,101,.16); }
 .micBig { box-shadow:0 10px 22px rgba(40,110,101,.25); }
@@ -208,6 +210,10 @@ label.switchRow { display:flex; align-items:center; justify-content:space-betwee
 @keyframes micPulse { 0%,100% { box-shadow:0 0 0 0 rgba(189,96,73,.28),0 10px 22px rgba(189,96,73,.2); } 55% { box-shadow:0 0 0 13px rgba(189,96,73,0),0 10px 22px rgba(189,96,73,.2); } }
 .voiceExample { color:#858c80; }
 .voiceSupport { max-width:420px; margin:8px auto 0; color:#747d73; font-size:10px; }
+.voiceFallback { width:min(100%,500px); margin:22px auto 0; padding-top:15px; border-top:1px solid var(--line); text-align:left; }
+.voiceFallback .row { gap:8px; }
+.voiceFallback input { margin:0; }
+.voiceFallback .btn { flex:none; }
 .voiceCard input { background:#faf8f2; border-color:rgba(38,62,56,.12); }
 .featureIcon,.iconAction { background:#e8efea; }
 .contactAvatar { color:#286e65; background:#e8efea; }
@@ -218,6 +224,24 @@ label.switchRow { display:flex; align-items:center; justify-content:space-betwee
 .reviewActions .btn:not(.primary) { background:#eeece5; }
 
 /* Calendar planning surface */
+.planHub { max-width:1000px; margin:0 auto; padding:0 0 108px; }
+.planPane[hidden] { display:none !important; }
+.planHubSwitch { display:flex; gap:4px; width:min(100% - 32px, 560px); margin:18px auto 0; padding:5px; border:1px solid var(--line); border-radius:18px; background:var(--sand); }
+.planHubSwitch button { display:flex; flex:1; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:8px 10px; border:0; border-radius:13px; color:var(--muted); background:transparent; font:600 13px var(--font-b); cursor:pointer; transition:background .18s,color .18s,transform .18s; }
+.planHubSwitch button.on { background:var(--card-solid); color:var(--ink); box-shadow:0 2px 9px rgba(0,0,0,.08); }
+.planHubSwitch button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.planHubSwitch button:active { transform:scale(.98); }
+.planHubSwitch svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.planHubNote { max-width:600px; margin:10px auto 0; padding:0 16px; text-align:center; color:var(--muted); font-size:12px; }
+.planInnerPage { max-width:900px; padding-top:26px; }
+.planPaneHeading { margin:0 0 20px; }
+.planPaneHeading h2 { margin:5px 0; font-size:29px; letter-spacing:-.04em; }
+.planPaneHeading p { color:var(--muted); font-size:14px; }
+.calendarEventRow .btn { width:auto; flex:none; margin:0; padding:7px 12px; }
+.reminderWhen { align-items:flex-start; gap:12px; }
+.reminderWhen > div { flex:1; min-width:0; }
+.reminderWhen input[type="time"] { font-variant-numeric:tabular-nums; }
+.reminderClockHint { margin:-5px 0 12px; }
 .calendarPage { max-width:900px; padding-top:30px; }
 .calendarIntro { display:flex; justify-content:space-between; align-items:center; gap:22px; margin:0 0 20px; }
 .calendarIntro h2 { max-width:570px; margin:5px 0 5px; font-size:29px; line-height:1.18; letter-spacing:-.04em; }
@@ -268,6 +292,10 @@ label.switchRow { display:flex; align-items:center; justify-content:space-betwee
 .priceHistoryEmpty { padding:12px 0 3px; color:var(--muted); font-size:12px; }
 .priceHistoryEmpty b { color:var(--ink); }
 @media(max-width:650px) {
+  .planHubSwitch { width:calc(100% - 26px); margin-top:12px; }
+  .planHubSwitch button { gap:5px; padding:7px 6px; font-size:12px; }
+  .planHubSwitch svg { width:16px; height:16px; }
+  .planPaneHeading h2 { font-size:25px; }
   .calendarPage { padding:24px 15px 120px; }
   .calendarIntro { align-items:flex-start; flex-direction:column; gap:12px; }
   .calendarIntro h2 { font-size:25px; }

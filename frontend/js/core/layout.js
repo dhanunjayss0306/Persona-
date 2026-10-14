@@ -1,5 +1,18 @@
 /* Shared page chrome and navigation. */
-function go(page) { location.href = page + '.html'; }
+function go(page) {
+  if (page === 'plan') {
+    if (!location.pathname.endsWith('/plan.html')) location.href = 'plan.html';
+    return;
+  }
+  const planningViews = { calendar: 'calendar', reminders: 'reminders', planner: 'planner' };
+  const view = planningViews[page];
+  if (view) {
+    if (location.pathname.endsWith('/plan.html')) window.PlanHub?.show(view);
+    else location.href = `plan.html#${view}`;
+    return;
+  }
+  location.href = page + '.html';
+}
 
 const AppIcon = {
   paths: {
@@ -23,8 +36,8 @@ const AppIcon = {
 };
 
 const Layout = {
-  TABS: [['today','home','Today'],['reminders','clock','Reminders'],['calendar','calendar','Calendar'],['ai','spark','Ask']],
-  MORE: [['planner','planner','Planner'],['journal','book','Journal'],['cart','cart','Price tracker'],['expenses','wallet','Expenses'],['favorites','star','Favorites'],['groups','users','Groups'],['voice','mic','Voice'],['settings','settings','Settings']],
+  TABS: [['today','home','Today'],['plan','calendar','Plan'],['ai','spark','Ask']],
+  MORE: [['journal','book','Journal'],['cart','cart','Price tracker'],['expenses','wallet','Expenses'],['favorites','star','Favorites'],['groups','users','Groups'],['voice','mic','Voice'],['settings','settings','Settings']],
   applyTheme() {
     const saved = localStorage.getItem('persona_theme');
     const theme = saved || 'dark';
@@ -36,7 +49,7 @@ const Layout = {
       themeMeta.name = 'theme-color';
       document.head.appendChild(themeMeta);
     }
-    themeMeta.content = theme === 'dark' ? '#171c19' : '#F5F2E9';
+    themeMeta.content = theme === 'dark' ? '#171c19' : '#E7EEE5';
   },
   setTheme(theme) {
     localStorage.setItem('persona_theme', theme === 'dark' ? 'dark' : 'light');
@@ -65,7 +78,8 @@ const Layout = {
       document.getElementById('themeBtn').onclick = () => this.setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
     }
     let nav = '';
-    if (mode === 'app') nav = '<nav id="tabbar" aria-label="Main navigation">' + this.TABS.map(([p, icon, label]) => `<button data-go="${p}" class="${p === tab ? 'on' : ''}" aria-label="${label}">${AppIcon.svg(icon)}<span>${label}</span></button>`).join('') + `<button data-more="1" aria-label="More">${AppIcon.svg('more')}<span>More</span></button></nav>`;
+    const activeTab = ['calendar', 'reminders', 'planner'].includes(tab) ? 'plan' : tab;
+    if (mode === 'app') nav = '<nav id="tabbar" aria-label="Main navigation">' + this.TABS.map(([p, icon, label]) => `<button data-go="${p}" class="${p === activeTab ? 'on' : ''}" aria-label="${label}">${AppIcon.svg(icon)}<span>${label}</span></button>`).join('') + `<button data-more="1" aria-label="More">${AppIcon.svg('more')}<span>More</span></button></nav>`;
     app.insertAdjacentHTML('beforeend', nav + '<div id="sheetWrap" class="hidden"><div id="sheetBg"></div><div id="sheet" class="glass"></div></div><div id="toast" class="hidden" role="status" aria-live="polite"></div>');
     document.getElementById('sheetBg').onclick = () => UI.closeSheet();
     if (mode === 'app') {
