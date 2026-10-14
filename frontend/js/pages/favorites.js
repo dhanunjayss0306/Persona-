@@ -19,7 +19,7 @@ Fav.render = async function () {
        <button class="btn sm" data-fdel="${f.id}">✕</button></div>`).join('')
       : `<p class="muted center" style="margin-top:30px">No ${Fav.kind}s yet. Tap + to add.</p>`;
     box.querySelectorAll('[data-fdel]').forEach((b) => b.onclick = async () => { await API.del(`/api/favorites/${b.dataset.fdel}`); Fav.render(); });
-  } catch (e) { box.innerHTML = '<p class="muted">Backend unreachable.</p>'; }
+  } catch (e) { box.innerHTML = `<div class="card"><p class="muted">Could not load favorites: ${UI.esc(e?.message || 'request failed')}</p><button class="btn" id="favRetry">Try again</button></div>`; document.getElementById('favRetry').onclick = () => Fav.render(); }
 };
 Fav.sheet = function () {
   UI.sheet(`<h3 style="font-family:var(--font-d);font-size:22px;margin-bottom:12px">Add ${Fav.kind}</h3>

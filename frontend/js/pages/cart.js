@@ -5,15 +5,16 @@ async function initCart() {
   document.getElementById('cartAdd').onclick = Cart.sheet;
   try {
     const items = await API.get('/api/cart');
-    if (!items.length) { box.innerHTML = '<div class="card center"><p style="font-size:40px">🛒</p><p><b>Cart is empty.</b></p><p class="muted sm">Paste a product link — I\'ll track its price.</p></div>'; return; }
+    if (!items.length) { box.innerHTML = '<div class="card center"><p style="font-size:40px">🛒</p><p><b>Cart is empty.</b></p><p class="muted sm">Track a product from a supported retailer. Prices are shown only when the retailer publishes a verifiable INR price.</p></div>'; return; }
     box.innerHTML = items.map((c) => {
-      const hit = c.target_price && c.last_price && Number(c.last_price) <= Number(c.target_price);
+      const verified = c.last_price_source === 'verified' && c.last_price != null;
+      const hit = c.target_price && verified && Number(c.last_price) <= Number(c.target_price);
       return `<div class="card"><b>${UI.esc(c.name)}</b>
         <p class="muted sm">${UI.esc(c.shop || '')} · <a href="${UI.esc(c.url)}" target="_blank">open product</a></p>
-        <p style="font-size:22px;font-weight:800;font-family:var(--font-d)">${c.last_price ? UI.inr(c.last_price) : '—'}
+        <p style="font-size:22px;font-weight:800;font-family:var(--font-d)">${verified ? UI.inr(c.last_price) : 'No verified price yet'}
         ${c.target_price ? `<span class="sm muted"> / target ${UI.inr(c.target_price)}</span>` : ''}</p>
         ${hit ? '<p><span class="badge nag">target hit</span></p>' : ''}
-        ${c.last_checked_at ? `<p class="sm muted">checked ${UI.dt(c.last_checked_at)}</p>` : ''}
+        ${verified && c.last_checked_at ? `<p class="sm muted">verified ${UI.dt(c.last_checked_at)}</p>` : '<p class="sm muted">The shop may block checks or omit exact price data; guesses are never displayed.</p>'}
         <div class="row" style="margin-top:10px"><button class="btn" data-check="${c.id}">↻ Check now</button>
         <button class="btn" data-edt="${c.id}">✎ Target</button>
         <button class="btn danger" style="margin:0" data-delc="${c.id}">✕</button></div>
@@ -21,7 +22,7 @@ async function initCart() {
     }).join('');
     box.querySelectorAll('[data-check]').forEach((b) => b.onclick = async () => {
       UI.toast('Checking…');
-      try { const r = await API.post(`/api/cart/${b.dataset.check}/check`); UI.toast(r.target_hit ? `🎯 Target hit at ${UI.inr(r.price)}!` : `Now ${UI.inr(r.price)}`); initCart(); }
+      try { const r = await API.post(`/api/cart/${b.dataset.check}/check`); UI.toast(r.target_hit ? `🎯 Target hit at ${UI.inr(r.price)}!` : `Verified at ${UI.inr(r.price)}`); initCart(); }
       catch (e) { UI.toast(e.message); }
     });
     items.forEach((item) => Cart.loadHistory(item.id));
@@ -36,7 +37,10 @@ async function initCart() {
     });
     box.querySelectorAll('[data-delc]').forEach((b) => b.onclick = () =>
       UI.confirmSheet('Remove from cart?', 'Price history goes too.', async () => { await API.del(`/api/cart/${b.dataset.delc}`); initCart(); }));
-  } catch (e) { box.innerHTML = '<p class="muted">Backend unreachable.</p>'; }
+  } catch (e) {
+    box.innerHTML = `<div class="card"><b>Could not load price tracker</b><p class="muted">${UI.esc(e?.message || 'Request failed')}</p><button class="btn" id="cartRetry">Try again</button></div>`;
+    document.getElementById('cartRetry').onclick = () => initCart();
+  }
 };
 const Cart = {
   async loadHistory(id) {
@@ -45,7 +49,7 @@ const Cart = {
     try {
       const history = await API.get(`/api/cart/${id}/history`);
       if (!history.length) {
-        el.innerHTML = '<p class="priceHistoryEmpty">No previous prices yet. Choose <b>Check now</b> to record the first one.</p>';
+        el.innerHTML = '<p class="priceHistoryEmpty">No verified history yet. Choose <b>Check now</b> to record a reading if the retailer provides exact INR price data.</p>';
         return;
       }
       const points = history.slice(-16).map((entry) => ({ price: Number(entry.price), date: entry.checked_at }));
@@ -65,15 +69,16 @@ const Cart = {
           ${coords.map((point) => `<circle class="historyPoint" cx="${point.x}" cy="${point.y}" r="3"><title>${UI.inr(point.price)}${point.date ? ` · ${UI.d(point.date)}` : ''}</title></circle>`).join('')}
           <circle class="historyLatest" cx="${last.x}" cy="${last.y}" r="5"/>
         </svg><div class="historyMeta"><span>Lowest <b>${UI.inr(low)}</b></span><span>Latest <b>${UI.inr(last.price)}</b></span><span>${last.date ? UI.d(last.date) : ''}</span></div>`;
-    } catch {
-      el.innerHTML = '<p class="priceHistoryEmpty">Could not load history. Check your connection and try again.</p>';
+    } catch (error) {
+      el.innerHTML = `<p class="priceHistoryEmpty">Could not load history: ${UI.esc(error?.message || 'request failed')}</p>`;
     }
   },
   sheet() {
     UI.sheet(`<h3 style="font-family:var(--font-d);font-size:22px;margin-bottom:12px">Track a product</h3>
       ${UI.field('Name', '<input id="cName" placeholder="boAt Nirvana Space">')}
-      ${UI.field('Product link', '<input id="cUrl" placeholder="https://… (Myntra, Ajio, Flipkart, Amazon)">')}
+      ${UI.field('Product link', '<input id="cUrl" placeholder="https://… (Amazon India, Flipkart, Croma, Myntra, Ajio)">')}
       ${UI.field('Tell me when below ₹ (optional)', '<input id="cT" type="number" placeholder="1500">')}
+      <p class="muted sm">Prices are recorded only when the shop page provides an explicit INR product price. Some stores block automatic checks.</p>
       <button class="btn primary" id="cGo" style="width:100%">Add + check price</button>`);
     document.getElementById('cGo').onclick = async () => {
       const name = document.getElementById('cName').value.trim(), url = document.getElementById('cUrl').value.trim();
@@ -81,7 +86,7 @@ const Cart = {
       try {
         const item = await API.post('/api/cart', { name, url, target_price: Number(document.getElementById('cT').value) || null });
         UI.closeSheet(); UI.toast('Added — checking price…');
-        API.post(`/api/cart/${item.id}/check`).then(() => initCart()).catch(() => initCart());
+        API.post(`/api/cart/${item.id}/check`).then(() => initCart()).catch((error) => { UI.toast(error.message, 5000); initCart(); });
       } catch (e) { UI.toast(e.message); }
     };
   },

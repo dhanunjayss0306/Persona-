@@ -3,6 +3,11 @@ async function initVoice() {
   const $ = (id) => document.getElementById(id);
   try { const profile = await API.get('/api/voice/profile'); $('wakeWord').value = profile.wake_word || 'Hey Persona'; } catch { /* Profile is optional until saved. */ }
   $('micBig').onclick = () => Voice.listen();
+  $('voiceFallbackGo').onclick = () => {
+    const text = $('voiceFallbackText').value.trim();
+    if (!text) return UI.toast('Type a task or something you want to remember');
+    Voice.processText(text);
+  };
   $('wakeSave').onclick = async () => {
     const word = $('wakeWord').value.trim() || 'Hey Persona';
     try { await API.post('/api/voice/profile', { wake_word: word }); UI.toast('Wake phrase saved'); }
@@ -20,22 +25,34 @@ async function initVoice() {
   };
   $('callGo').onclick = async () => {
     const name = $('callName').value.trim(); if (!name) return UI.toast('Enter a contact name');
-    try { const result = await API.get('/api/voice/call?name=' + encodeURIComponent(name)); location.href = result.tel_link; }
-    catch (error) { UI.toast(error.message); }
+    UI.confirmSheet('Call this contact?', `Persona will open your phone app for ${name}.`, async () => {
+      try { const result = await API.get('/api/voice/call?name=' + encodeURIComponent(name)); location.href = result.tel_link; }
+      catch (error) { UI.toast(error.message); }
+    }, 'Open phone');
   };
   $('songGo').onclick = async () => {
     const song = $('songName').value.trim(); if (!song) return UI.toast('Enter a song');
-    const tab = window.open('about:blank', '_blank');
-    if (!tab) return UI.toast('Allow pop-ups to open JioSaavn.');
-    tab.opener = null;
-    try { const result = await API.get('/api/voice/jiosaavn?song=' + encodeURIComponent(song)); tab.location.href = result.url; }
-    catch (error) { tab.close(); UI.toast(error.message); }
+    UI.confirmSheet('Find this song?', `Open a music search for ${song}.`, async () => {
+      const tab = window.open('about:blank', '_blank');
+      if (!tab) return UI.toast('Allow pop-ups to open JioSaavn.');
+      tab.opener = null;
+      try { const result = await API.get('/api/voice/jiosaavn?song=' + encodeURIComponent(song)); tab.location.href = result.url; }
+      catch (error) { tab.close(); UI.toast(error.message); }
+    }, 'Find song');
+  };
+  $('placeGo').onclick = () => {
+    const place = $('placeName').value.trim(); if (!place) return UI.toast('Enter a place or address');
+    UI.confirmSheet('Open directions?', `Show a route to ${place} in Google Maps.`, () => { location.href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`; }, 'Open Maps');
   };
   $('meetGo').onclick = async () => {
-    try {
-      const result = await API.post('/api/voice/meet', { title: $('meetTitle').value.trim() || 'Persona meeting' });
-      $('meetOut').innerHTML = `<p class="meetResult">Meet link ready · <a href="${UI.esc(result.meet_link)}" target="_blank" rel="noopener">Open meeting</a></p>`;
-    } catch (error) { UI.toast(error.message); if (/connect google/i.test(error.message)) $('googleConnect').classList.remove('hidden'); }
+    const title = $('meetTitle').value.trim() || 'Persona meeting';
+    UI.confirmSheet('Create a Google Meet?', `Persona will create a calendar event called “${title}”.`, async () => {
+      try {
+        const result = await API.post('/api/voice/meet', { title });
+        $('meetOut').innerHTML = `<p class="meetResult">Meet link ready · <a href="${UI.esc(result.meet_link)}" target="_blank" rel="noopener">Open meeting</a> <button class="btn sm" id="copyMeetLink">Copy link</button></p>`;
+        document.getElementById('copyMeetLink').onclick = async () => { try { await navigator.clipboard.writeText(result.meet_link); UI.toast('Meet link copied'); } catch { UI.toast(result.meet_link); } };
+      } catch (error) { UI.toast(error.message); if (/connect google/i.test(error.message)) $('googleConnect').classList.remove('hidden'); }
+    }, 'Create meeting');
   };
   $('cAdd').onclick = async () => {
     const name = $('cName').value.trim(), phone = $('cPhone').value.trim();
@@ -93,15 +110,16 @@ const Voice = {
       this.processText(text);
     };
     recognition.onerror = (event) => {
-      this.resetMic();
       const messages = {
         'not-allowed':'Microphone access was blocked. Allow it in the site controls beside the address bar.',
         'service-not-allowed':'Speech recognition is blocked by this browser.',
         'no-speech':'No speech detected. Check your microphone and try again.',
         'audio-capture':'No microphone was found.',
-        'network':'Speech recognition could not reach its service. Check your connection and browser settings.',
+        'network':'Microphone access worked, but the browser speech-to-text service is unreachable. Check the internet and browser speech settings, or type your request below.',
       };
-      if (event.error !== 'aborted') UI.toast(messages[event.error] || 'Microphone error. Please try again.', 5000);
+      const message = messages[event.error] || 'Microphone error. Please try again.';
+      this.resetMic(event.error === 'aborted' ? 'Tap the microphone and speak' : message);
+      if (event.error !== 'aborted') UI.toast(message, 5000);
     };
     recognition.onend = () => { if (this.listening) this.resetMic(); };
     try { recognition.start(); }
@@ -167,7 +185,7 @@ const Voice = {
     };
     recognition.onerror = (event) => {
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') { this.stopWake(); UI.toast('Microphone access was blocked. Allow it in the site controls beside the address bar.', 5000); }
-      else if (event.error === 'network') UI.toast('Speech recognition could not reach its service. Check your connection.', 5000);
+      else if (event.error === 'network') UI.toast('Microphone access is working, but your browser speech-to-text service is unreachable. Check network/browser speech settings or try Chrome.', 5000);
     };
     recognition.onend = () => {
       if (this.watching) this.watchRestart = setTimeout(() => { if (this.watching) { try { recognition.start(); } catch { this.stopWake(); UI.toast('Wake phrase listening stopped. Tap to restart.'); } } }, 350);

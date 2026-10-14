@@ -21,4 +21,5 @@ cd ../frontend && python3 -m http.server 8080   # → http://localhost:8080
 
 First-time setup (Supabase tables, Firebase, Google, Spotify): `docs/Persona_Technical_Guide.md`
 and `env/API_KEYS_GUIDE.md`. Database tables explained: `backend/db/TABLES.md`.
+Manager-facing feature inventory, architecture, setup, and known gaps: `docs/Persona_Features_Guide.md`.
 Deploy: `backend/deploy/ORACLE.md`.

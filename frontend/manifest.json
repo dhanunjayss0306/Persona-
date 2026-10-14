@@ -1,5 +1,5 @@
 {
-  "background_color": "#171c19",
+  "background_color": "#FFF7E8",
   "description": "Persona \u2014 reminders that nag till proven, planner, journal, price tracker.",
   "display": "standalone",
   "gcm_sender_id": "103953800507",
@@ -20,5 +20,5 @@
   "scope": "./",
   "short_name": "Persona",
   "start_url": "./index.html",
-  "theme_color": "#171c19"
+  "theme_color": "#FFF7E8"
 }

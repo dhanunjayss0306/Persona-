@@ -28,12 +28,14 @@ const Auth = {
     const token = await firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
     if (!token) return false;
     await API.post('/api/auth/devices', { fcm_token: token, label: 'web' });
+    localStorage.setItem('persona_push_registered', 'true');
     console.info('[push] device registered');
     return true;
   },
   logout() {
     localStorage.removeItem('persona_token');
     localStorage.removeItem('persona_user');
+    localStorage.removeItem('persona_push_registered');
     location.href = '../index.html';
   },
   /* ---- index.html (login) ---- */

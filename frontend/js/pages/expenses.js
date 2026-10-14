@@ -15,7 +15,7 @@ async function initExpenses() {
        <div class="t"><b>${UI.inr(e.amount)}${e.paid_to ? ' → ' + UI.esc(e.paid_to) : ''}</b><span>${UI.esc(e.upi_app || '')} ${UI.esc(e.category || '')} · ${UI.dt(e.spent_at)}</span></div>
        <button class="btn sm" data-exdel="${e.id}">✕</button></div>`).join('') || '<p class="muted center">No expenses logged.</p>';
     document.querySelectorAll('[data-exdel]').forEach((b) => b.onclick = async () => { await API.del(`/api/expenses/${b.dataset.exdel}`); initExpenses(); });
-  } catch (e) { document.getElementById('expList').innerHTML = '<p class="muted">Backend unreachable.</p>'; }
+  } catch (e) { document.getElementById('expList').innerHTML = `<div class="card"><p class="muted">Could not load expenses: ${UI.esc(e?.message || 'request failed')}</p><button class="btn" id="expRetry">Try again</button></div>`; document.getElementById('expRetry').onclick = () => initExpenses(); }
 };
 const Exp = {
   sheet() {

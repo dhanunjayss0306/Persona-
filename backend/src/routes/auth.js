@@ -2,6 +2,7 @@
 const express = require('express');
 const supabase = require('../db');
 const { signToken, requireAuth, hashPassword, checkPassword } = require('../auth');
+const { sendToUser, isReady: pushReady } = require('../services/push');
 
 const router = express.Router();
 
@@ -125,6 +126,16 @@ router.post('/devices', requireAuth, async (req, res) => {
     .upsert({ user_id: req.user.id, fcm_token, label: label || null }, { onConflict: 'fcm_token' });
   if (error) return res.status(500).json({ error: error.message });
   console.log('[push] device registered');
+  res.json({ ok: true });
+});
+
+router.post('/devices/test', requireAuth, async (req, res) => {
+  if (!pushReady()) return res.status(503).json({ error: 'Push delivery is not configured on the backend.' });
+  const { data: devices, error } = await supabase.from('devices').select('id').eq('user_id', req.user.id);
+  if (error) return res.status(500).json({ error: error.message });
+  if (!devices?.length) return res.status(409).json({ error: 'This device is not registered. Enable notifications in Settings first.' });
+  const delivered = await sendToUser(req.user.id, 'Persona test notification', 'Notifications are reaching this device.', { kind: 'test' });
+  if (!delivered) return res.status(502).json({ error: 'Firebase could not deliver the test. Refresh device registration and check your browser notification permission.' });
   res.json({ ok: true });
 });
 

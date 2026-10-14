@@ -1,5 +1,6 @@
 /* planner.js — build 2–3 month plans, re-plan, tick days, fixed events. */
 async function initPlanner() {
+  Plan.initNaturalLanguage();
   const box = document.getElementById('planList');
   box.innerHTML = '<p class="muted">Loading…</p>';
   document.getElementById('planAdd').onclick = Plan.sheet;
@@ -31,6 +32,42 @@ async function initPlanner() {
   }
 };
 const Plan = {
+  previewItems: [],
+  initNaturalLanguage() {
+    const draft = document.getElementById('monthPlanDraft');
+    const input = document.getElementById('monthPlanPrompt');
+    if (!draft || draft.dataset.bound) return;
+    draft.dataset.bound = '1';
+    const status = document.getElementById('monthPlanStatus');
+    const previewBox = document.getElementById('monthPlanPreview');
+    const draw = () => {
+      previewBox.innerHTML = this.previewItems.map((item, index) => `<article class="monthPlanItem"><div class="monthPlanFields"><input aria-label="Task title" data-plan-field="title" data-plan-index="${index}" maxlength="160" value="${UI.esc(item.title)}"><select aria-label="Type" data-plan-field="type" data-plan-index="${index}">${['study','assignment','project','exam','event'].map((type) => `<option${item.type === type ? ' selected' : ''}>${type}</option>`).join('')}</select><input aria-label="Start date" data-plan-field="start_date" data-plan-index="${index}" type="date" value="${UI.esc(item.start_date)}"><input aria-label="Due date" data-plan-field="due_date" data-plan-index="${index}" type="date" value="${UI.esc(item.due_date || item.end_date || item.start_date)}"><input aria-label="Minutes" data-plan-field="duration_minutes" data-plan-index="${index}" type="number" min="15" max="1440" value="${Number(item.duration_minutes) || 60}"><select aria-label="Priority" data-plan-field="priority" data-plan-index="${index}">${['high','medium','low'].map((priority) => `<option${item.priority === priority ? ' selected' : ''}>${priority}</option>`).join('')}</select><button type="button" class="btn sm" data-plan-remove="${index}">Remove</button></div><input aria-label="Notes" placeholder="Notes" data-plan-field="notes" data-plan-index="${index}" value="${UI.esc(item.notes || '')}"></article>`).join('') + (this.previewItems.length ? '<div class="row"><button class="btn" id="monthPlanAddItem" type="button">Add item</button><button class="btn primary" id="monthPlanConfirm" type="button">Confirm and save plan</button></div>' : '');
+      previewBox.querySelectorAll('[data-plan-field]').forEach((field) => field.onchange = () => { const item = this.previewItems[Number(field.dataset.planIndex)]; item[field.dataset.planField] = field.dataset.planField === 'duration_minutes' ? Number(field.value) : field.value; });
+      previewBox.querySelectorAll('[data-plan-remove]').forEach((button) => button.onclick = () => { this.previewItems.splice(Number(button.dataset.planRemove), 1); draw(); });
+      const add = document.getElementById('monthPlanAddItem'); if (add) add.onclick = () => { this.previewItems.push({ title: 'New task', type: 'study', start_date: new Date().toISOString().slice(0,10), duration_minutes: 60, priority: 'medium', notes: '' }); draw(); };
+      const confirm = document.getElementById('monthPlanConfirm'); if (confirm) confirm.onclick = async () => {
+        this.previewItems.forEach((item) => { item.due_date = item.due_date || item.end_date || item.start_date; });
+        confirm.disabled = true; confirm.textContent = 'Saving…';
+        try { const result = await API.post('/api/planner/confirm', { items: this.previewItems }); status.textContent = `Saved ${result.saved} reviewed items to your plan, calendar, and reminders.`; this.previewItems = []; draw(); initPlanner(); }
+        catch (error) { confirm.disabled = false; confirm.textContent = 'Confirm and save plan'; UI.toast(error.message); }
+      };
+    };
+    draft.onclick = async () => {
+      const prompt = input.value.trim(); if (!prompt) return UI.toast('Describe your month first');
+      draft.disabled = true; status.textContent = 'Checking your calendar and drafting a plan…';
+      try { const result = await API.post('/api/planner/preview', { prompt }); this.previewItems = result.items || []; draw(); status.textContent = this.previewItems.length ? `Review ${this.previewItems.length} suggested items. Nothing has been saved yet.` : 'No schedulable items were returned. Add more detail or use the standard planner.'; }
+      catch (error) { status.textContent = `${error.message} Your existing plan is unchanged. The standard study planner remains available below.`; }
+      finally { draft.disabled = false; }
+    };
+    document.getElementById('monthPlanMic').onclick = () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) return UI.toast('Voice drafting needs Chrome or Edge. Type your schedule instead.');
+      const recognition = new SpeechRecognition(); recognition.lang = 'en-IN'; recognition.interimResults = false;
+      recognition.onresult = (event) => { input.value = `${input.value.trim()} ${event.results[0][0].transcript}`.trim(); };
+      recognition.onerror = () => UI.toast('Could not transcribe that. You can type your schedule instead.');
+      try { recognition.start(); status.textContent = 'Listening for your schedule…'; } catch { UI.toast('Could not start voice input.'); }
+    };
+  },
   sheet() {
     const t = new Date().toISOString().slice(0, 10);
     const e = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);

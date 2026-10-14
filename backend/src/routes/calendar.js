@@ -28,7 +28,7 @@ router.get('/', requireAuth, asyncRoute(async (req, res) => {
   const planIds = (plans || []).map((p) => p.id);
   let plan_days = [];
   if (planIds.length) {
-    const { data, error } = await supabase.from('plan_days').select('day,blocks,done')
+    const { data, error } = await supabase.from('plan_days').select('id,plan_id,day,blocks,done')
       .in('plan_id', planIds).gte('day', from).lte('day', to).order('day');
     if (error) throw error;
     plan_days = data || [];
@@ -48,7 +48,7 @@ router.get('/', requireAuth, asyncRoute(async (req, res) => {
     (days[key] = days[key] || { date: key, reminders: [], plan_blocks: [], events: [] })[kind].push(item);
   };
   (reminders || []).forEach((r) => put(r.due_at, 'reminders', r));
-  plan_days.forEach((d) => (d.blocks || []).forEach((b) => put(d.day, 'plan_blocks', { ...b, done: d.done })));
+  plan_days.forEach((d) => (d.blocks || []).forEach((b) => put(d.day, 'plan_blocks', { ...b, done: d.done, plan_id: d.plan_id, day: d.day })));
   (fixedEvents || []).forEach((e) => put(e.event_date, 'events', { ...e, source: 'fixed' }));
   (calendarEventsData || []).forEach((e) => put(e.event_date, 'events', { ...e, kind: 'activity', source: 'calendar' }));
 

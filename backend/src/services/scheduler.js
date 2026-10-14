@@ -1,18 +1,14 @@
 // services/scheduler.js — the alarm clock of Persona.
 //
-// Two jobs:
-//   1. EVERY MINUTE — the nag loop:
+// One job:
+//   EVERY MINUTE — the sticky reminder loop:
 //        - 'nag' reminders: due, not done, and (never nagged OR last nag >= 5 min ago)
 //          → push "still pending…" and stamp last_nagged_at.
-//          The loop ONLY stops when a proof row exists (status='done').
+//          Marking status='done' stops the loop; proof is optional.
 //        - 'once' reminders: due and never fired → push once, status='notified'.
-//   2. DAILY (8 AM) — price checks: for each tracked cart item, fetch the
-//      price, save history, and if it hit the target → create a one-time
-//      reminder (which itself pushes once through job 1).
 const cron = require('node-cron');
 const supabase = require('../db');
 const { sendToUser } = require('./push');
-const { fetchPrice } = require('./price');
 
 const NAG_INTERVAL_MIN = 5;
 
@@ -21,55 +17,40 @@ async function nagTick() {
   const fiveMinAgo = new Date(Date.now() - NAG_INTERVAL_MIN * 60000).toISOString();
 
   // Work nags: due + not done + (never nagged OR 5 min since last nag).
-  const { data: nags } = await supabase.from('reminders').select('id,user_id,title')
+  const { data: nags } = await supabase.from('reminders').select('id,user_id,title,details')
     .eq('type', 'nag').eq('status', 'ringing').lte('due_at', now)
     .or(`last_nagged_at.is.null,last_nagged_at.lte.${fiveMinAgo}`);
   // Freshly due nags move pending -> ringing.
-  const { data: fresh } = await supabase.from('reminders').select('id,user_id,title')
+  const { data: fresh } = await supabase.from('reminders').select('id,user_id,title,details')
     .eq('type', 'nag').eq('status', 'pending').lte('due_at', now);
   for (const r of fresh || []) {
     await supabase.from('reminders').update({ status: 'ringing' }).eq('id', r.id);
   }
   for (const r of [...(fresh || []), ...(nags || [])]) {
-    await sendToUser(r.user_id, '⏰ ' + r.title, 'Still pending — tap "I have done that" and add proof to stop this.', { reminder_id: r.id });
-    await supabase.from('reminders').update({ last_nagged_at: new Date().toISOString() }).eq('id', r.id);
+    const nudges = [
+      r.details || `You still have this to do: ${r.title}`,
+      `A quick nudge: ${r.title} is still waiting for you.`,
+      `Make a little progress now: ${r.title}.`,
+    ];
+    const nudge = nudges[Math.floor(Date.now() / (NAG_INTERVAL_MIN * 60000)) % nudges.length];
+    const delivered = await sendToUser(r.user_id, '⏰ ' + r.title, nudge, { reminder_id: r.id });
+    if (delivered) await supabase.from('reminders').update({ last_nagged_at: new Date().toISOString() }).eq('id', r.id);
   }
 
   // One-time reminders: fire once.
   const { data: once } = await supabase.from('reminders').select('id,user_id,title,details')
     .eq('type', 'once').eq('status', 'pending').lte('due_at', now);
   for (const r of once || []) {
-    await sendToUser(r.user_id, '🔔 ' + r.title, r.details || 'Reminder', { reminder_id: r.id });
-    await supabase.from('reminders').update({ status: 'notified' }).eq('id', r.id);
+    const delivered = await sendToUser(r.user_id, '🔔 ' + r.title, r.details || 'Reminder', { reminder_id: r.id });
+    // Keep it pending when no device accepted the message so registering a
+    // device later can still deliver the reminder instead of losing it.
+    if (delivered) await supabase.from('reminders').update({ status: 'notified' }).eq('id', r.id);
   }
-}
-
-async function priceTick() {
-  const { data: items } = await supabase.from('cart_items').select('*');
-  for (const item of items || []) {
-    const price = await fetchPrice(item.url);
-    if (price == null) continue;
-    await supabase.from('price_history').insert({ cart_item_id: item.id, price });
-    const hit = item.target_price && price <= Number(item.target_price);
-    await supabase.from('cart_items').update({
-      last_price: price, last_checked_at: new Date().toISOString(),
-      alert_sent: hit ? true : item.alert_sent,
-    }).eq('id', item.id);
-    if (hit && !item.alert_sent) {
-      await supabase.from('reminders').insert({
-        user_id: item.user_id, type: 'once', proof_required: false,
-        title: `Price drop: ${item.name} is now ₹${price}`, details: item.url,
-        due_at: new Date().toISOString(), status: 'pending',
-      });
-    }
-  }
-  console.log('[scheduler] price check done');
 }
 
 function start() {
   cron.schedule('* * * * *', () => nagTick().catch((e) => console.error('[nag]', e.message)));
-  cron.schedule('0 8 * * *', () => priceTick().catch((e) => console.error('[price]', e.message)));
-  console.log('[scheduler] nag loop: every minute · price check: daily 8 AM');
+  console.log('[scheduler] sticky reminder loop: every minute');
 }
 
-module.exports = { start, nagTick, priceTick };
+module.exports = { start, nagTick };

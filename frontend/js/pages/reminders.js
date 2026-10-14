@@ -115,6 +115,54 @@ const Reminders = {
     };
   },
 };
+
+const Tasks = { filter: 'today' };
+async function initTasks() {
+  document.getElementById('taskAdd').onclick = () => Tasks.add();
+  document.querySelectorAll('#taskSeg [data-task-filter]').forEach((button) => button.onclick = () => {
+    Tasks.filter = button.dataset.taskFilter;
+    document.querySelectorAll('#taskSeg [data-task-filter]').forEach((tab) => tab.classList.toggle('on', tab === button));
+    Tasks.render();
+  });
+  await Tasks.render();
+}
+Tasks.render = async function () {
+  const box = document.getElementById('taskList'); box.innerHTML = '<p class="muted">Loading tasks?</p>';
+  try {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const fromDate = new Date(today); fromDate.setDate(fromDate.getDate()-90);
+    const toDate = new Date(today); toDate.setDate(toDate.getDate()+90);
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const [all, calendar] = await Promise.all([API.get('/api/reminders'), API.get(`/api/calendar?from=${iso(fromDate)}&to=${iso(toDate)}`)]);
+    const tasks = [
+      ...all.map((task) => ({ id:task.id, title:task.title, due:task.due_at, done:task.status==='done', source:'reminder', detail:`Sticky reminder ? ${task.status}`, raw:task })),
+      ...Object.entries(calendar.days || {}).flatMap(([date,day]) => [
+        ...(day.events||[]).map((event) => ({ id:event.id, title:event.title, due:event.source==='calendar' ? `${date}T${event.start_time||'09:00'}` : `${date}T00:00`, done:false, source:event.source==='calendar'?'calendar':'fixed', detail:event.kind||'Calendar event', raw:event })),
+        ...(day.plan_blocks||[]).map((block) => ({ id:`${block.plan_id}|${date}`, title:block.title, due:`${date}T12:00`, done:Boolean(block.done), source:'plan', detail:`Study block ? ${block.minutes||0} min`, raw:block })),
+      ]),
+    ];
+    const filtered = tasks.filter((task) => {
+      const due=new Date(task.due);
+      if(this.filter==='done') return task.done;
+      if(task.done) return false;
+      if(this.filter==='today') return due>=today && due<new Date(today.getTime()+864e5);
+      if(this.filter==='overdue') return due<today;
+      return due>=new Date(today.getTime()+864e5);
+    }).sort((a,b)=>new Date(a.due)-new Date(b.due));
+    box.innerHTML = filtered.length ? filtered.map((task) => `<div class="rem taskRow${task.done?' done':''}" data-task-source="${task.source}" data-task-id="${UI.esc(task.id)}"><div class="dot"></div><div class="t"><b>${UI.esc(task.title)}</b><span>${UI.esc(task.detail)} ? ${UI.d(task.due)}</span></div>${task.source==='reminder'?`<button class="btn sm" data-task-edit="${UI.esc(task.id)}">Edit</button>${task.done?'':`<button class="btn primary sm" data-task-done="${UI.esc(task.id)}">Done</button>`}<button class="btn sm" data-task-delete="${UI.esc(task.id)}" aria-label="Delete ${UI.esc(task.title)}">?</button>`:task.source==='plan'&&!task.done?`<button class="btn primary sm" data-task-plan-done="${UI.esc(task.id)}">Done</button>`:task.source==='calendar'?`<button class="btn sm" data-task-calendar-edit="${UI.esc(task.id)}">Edit</button><button class="btn sm" data-task-calendar-delete="${UI.esc(task.id)}">Delete</button>`:'<span class="badge">Event</span>'}</div>`).join('') : `<div class="card center"><p><b>No ${this.filter} items.</b></p><p class="muted sm">A little space to breathe, or add a task when you?re ready.</p></div>`;
+    box.querySelectorAll('[data-task-edit]').forEach((button) => button.onclick=(event)=>{event.stopPropagation();Reminders.detail(button.dataset.taskEdit);});
+    box.querySelectorAll('[data-task-done]').forEach((button) => button.onclick=async(event)=>{event.stopPropagation();try{await API.patch(`/api/reminders/${button.dataset.taskDone}`,{status:'done'});await Tasks.render();UI.toast('Task done');}catch(error){UI.toast(error.message);}});
+    box.querySelectorAll('[data-task-plan-done]').forEach((button) => button.onclick=async()=>{const [plan_id,day]=button.dataset.taskPlanDone.split('|');try{await API.post('/api/planner/day-done',{plan_id,day});await Tasks.render();UI.toast('Study day complete');}catch(error){UI.toast(error.message);}});
+    box.querySelectorAll('[data-task-delete]').forEach((button) => button.onclick=(event)=>{event.stopPropagation();UI.confirmSheet('Delete task?','This cannot be undone.',async()=>{await API.del(`/api/reminders/${button.dataset.taskDelete}`);await Tasks.render();});});
+    box.querySelectorAll('[data-task-calendar-edit]').forEach((button)=>button.onclick=()=>{const item=tasks.find((task)=>task.source==='calendar'&&String(task.id)===button.dataset.taskCalendarEdit);if(item)Cal.edit(item.raw);});
+    box.querySelectorAll('[data-task-calendar-delete]').forEach((button)=>button.onclick=async()=>{try{await API.del(`/api/calendar/events/${button.dataset.taskCalendarDelete}`);await Tasks.render();UI.toast('Calendar event removed');}catch(error){UI.toast(error.message);}});
+  } catch (error) { box.innerHTML = `<div class="card"><b>Could not load tasks</b><p class="muted">${UI.esc(error.message)}</p><button class="btn" id="taskRetry">Retry</button></div>`; document.getElementById('taskRetry').onclick = () => Tasks.render(); }
+};
+Tasks.add = function () {
+  const now = new Date(); now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
+  UI.sheet(`<h3 style="font-family:var(--font-d);font-size:22px;margin-bottom:12px">Add a task</h3>${UI.field('Task', '<input id="taskTitle" maxlength="160" placeholder="Finish the assignment">')}<div class="row"><input id="taskDate" type="date" value="${now.toISOString().slice(0,10)}" aria-label="Due date"><input id="taskTime" type="time" value="17:00" aria-label="Due time"></div><button class="btn primary" id="taskSave" style="width:100%">Add sticky task</button><p class="muted sm" style="margin-top:8px">Persona will keep reminding you every five minutes until you mark it done.</p>`);
+  document.getElementById('taskSave').onclick = async () => { const title=document.getElementById('taskTitle').value.trim(), date=document.getElementById('taskDate').value, time=document.getElementById('taskTime').value; if (!title || !date || !time) return UI.toast('Add a task and due time'); try { await API.post('/api/reminders',{title,type:'nag',proof_required:false,due_at:new Date(`${date}T${time}`).toISOString()}); UI.closeSheet(); await Tasks.render(); UI.toast('Sticky task added'); } catch(error) { UI.toast(error.message); } };
+};
 function initReminders() {
   document.querySelectorAll('#remSeg button').forEach((b) => b.onclick = () => {
     document.querySelectorAll('#remSeg button').forEach((x) => x.classList.remove('on'));

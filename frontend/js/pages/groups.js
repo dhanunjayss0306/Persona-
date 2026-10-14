@@ -30,7 +30,7 @@ async function initGroups() {
       await API.post(`/api/groups/tasks/${b.dataset.gdone}/done`);
       UI.toast('Marked done ✓'); initGroups();
     });
-  } catch (e) { box.innerHTML = '<p class="muted">Backend unreachable.</p>'; }
+  } catch (e) { box.innerHTML = `<div class="card"><p class="muted">Could not load groups: ${UI.esc(e?.message || 'request failed')}</p><button class="btn" id="groupRetry">Try again</button></div>`; document.getElementById('groupRetry').onclick = () => initGroups(); }
 };
 const Groups = {
   sheet() {

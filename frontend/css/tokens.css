@@ -1,26 +1,31 @@
-/* Persona design tokens — professional Apple/Samsung system style. Flat, no gradients. */
+/* Persona color system: warm botanical editorial light theme and midnight violet dark theme. */
 :root {
   color-scheme:light;
-  --paper:#F5F2E9; --ink:#20312F; --muted:#677571;
-  --gold:#BA7B35; --signal:#C6654C; --charcoal:#20312F;
-  --card:rgba(255,255,255,.9); --card-solid:#FFFEFA; --sand:#EAEDE6;
-  --line:rgba(38,62,56,.12);
-  --danger:#B64D42; --ok:#38775D; --accent:#286E65;
+  --paper:#FFF7E8; --ink:#28231F; --muted:#71645A;
+  --gold:#C65D21; --signal:#C9184A; --charcoal:#28231F;
+  --card:rgba(255,252,244,.92); --card-solid:#FFFCF4; --sand:#F6C9D2;
+  --line:rgba(40,35,31,.12);
+  --danger:#C9184A; --ok:#73966A; --accent:#C9184A;
+  --burnt:#C65D21; --blush:#F6C9D2; --pink:#E78CA3; --leaf:#B7D7B0; --editorial:#163A63; --royal:#163A63; --electric:#C9184A;
+  --on-accent:#FFFFFF;
   --r:18px; --r-sm:12px;
-  --font-d:'Inter',-apple-system,sans-serif; --font-b:'Inter',-apple-system,sans-serif;
-  --shadow:0 12px 30px rgba(40,57,48,.075);
+  --font-d:Georgia,'Times New Roman',serif; --font-b:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --shadow:0 12px 30px rgba(67,43,29,.09);
   --spring:cubic-bezier(.32,.72,.35,1);
 }
 html[data-theme="dark"] {
   color-scheme:dark;
-  --paper:#171c19; --ink:#e7ece7; --muted:#a4afa8;
-  --gold:#d9ad69; --signal:#d47b61; --charcoal:#e7ece7;
-  --card:rgba(35,43,38,.94); --card-solid:#232b26; --sand:#303a33;
-  --line:rgba(230,239,231,.13);
-  --danger:#ef9384; --ok:#8fc4a2; --accent:#83b9a9;
-  --shadow:0 14px 34px rgba(0,0,0,.24);
+  --paper:#090916; --ink:#F4F0E7; --muted:#B5ADC3;
+  --gold:#FFD84D; --signal:#FFD84D; --charcoal:#B5ADC3;
+  --card:rgba(25,22,42,.96); --card-solid:#19162A; --sand:#29233B;
+  --line:rgba(180,150,255,.2);
+  --danger:#FFD84D; --ok:#B7D7B0; --accent:#A879FF;
+  --burnt:#C65D21; --blush:#F6C9D2; --pink:#E78CA3; --leaf:#B7D7B0; --editorial:#C7B6F0; --royal:#35245A; --electric:#A879FF;
+  --on-accent:#090916;
+  --shadow:0 14px 36px rgba(0,0,0,.42);
 }
-html[data-theme="dark"] body::after { opacity:.16; }
+html[data-theme="dark"] body::before { opacity:.11; filter:hue-rotate(58deg) saturate(1.5) brightness(.68); }
+html[data-theme="dark"] body::after { opacity:.09; filter:hue-rotate(58deg) saturate(1.5) brightness(.62); }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body { height:100%; }
 body {
@@ -29,12 +34,15 @@ body {
   -webkit-font-smoothing:antialiased;
 }
 body { position:relative; }
-body::before { content:''; position:fixed; z-index:0; pointer-events:none; inset:0 0 auto auto; width:min(58vw,650px); height:min(58vw,650px); background:url('../assets/ambient-linework.svg') right -90px top -120px / contain no-repeat; opacity:.72; }
-body::after { content:''; position:fixed; z-index:0; pointer-events:none; left:-90px; bottom:-145px; width:min(50vw,520px); height:min(60vh,620px); background:url('../assets/ambient-botanical.svg') left bottom / contain no-repeat; opacity:.34; }
-@media(max-width:650px) { body::before { width:82vw; height:82vw; opacity:.5; } body::after { left:-116px; bottom:-155px; width:78vw; height:54vh; opacity:.22; } }
+body::before { content:''; position:fixed; z-index:0; pointer-events:none; inset:0 0 auto auto; width:min(58vw,650px); height:min(58vw,650px); background:url('../assets/ambient-linework.svg') right -90px top -120px / contain no-repeat; opacity:.28; filter:hue-rotate(285deg) saturate(.72); animation:ambientDrift 34s ease-in-out infinite alternate; transform-origin:70% 20%; }
+body::after { content:''; position:fixed; z-index:0; pointer-events:none; left:-90px; bottom:-145px; width:min(50vw,520px); height:min(60vh,620px); background:url('../assets/ambient-botanical.svg') left bottom / contain no-repeat; opacity:.22; filter:hue-rotate(285deg) saturate(.75); animation:ambientFloat 26s ease-in-out infinite alternate; }
+@keyframes ambientDrift { from { transform:translate3d(0,0,0) rotate(-2deg); } to { transform:translate3d(-12px,14px,0) rotate(2deg); } }
+@keyframes ambientFloat { from { transform:translate3d(0,0,0); } to { transform:translate3d(12px,-10px,0); } }
+@media (prefers-reduced-motion: reduce) { body::before, body::after { animation:none; } }
+@media(max-width:650px) { body::before { width:82vw; height:82vw; opacity:.22; } body::after { left:-116px; bottom:-155px; width:78vw; height:54vh; opacity:.18; } }
 #app { position:relative; z-index:1; }
 button, input, select, textarea { font:inherit; }
-button:focus-visible, a:focus-visible { outline:3px solid rgba(40,110,101,.38); outline-offset:3px; }
+button:focus-visible, a:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 52%, transparent); outline-offset:3px; }
 .hidden { display:none !important; }
 .pad { padding:24px 24px 110px; max-width:640px; margin:0 auto; }
 .display { font-family:var(--font-d); font-weight:700; letter-spacing:-.02em; font-size:32px; margin:8px 0 16px; }
@@ -64,8 +72,8 @@ button:focus-visible, a:focus-visible { outline:3px solid rgba(40,110,101,.38); 
 }
 
 /* User's logo */
-.logoMark { width:34px; height:34px; border-radius:9px; flex:none; object-fit:contain; display:block; background:#fff; }
+.logoMark { width:34px; height:34px; border-radius:9px; flex:none; object-fit:contain; display:block; background:var(--sand); box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 20%,transparent),0 2px 8px rgba(32,49,47,.12); }
 .logoMark.lg { width:72px; height:72px; border-radius:18px; }
 .brandHome { display:grid; place-items:center; flex:none; border-radius:11px; }
 .brandHome:hover { transform:translateY(-1px); }
-.brandHome:focus-visible { outline:3px solid rgba(40,110,101,.4); outline-offset:3px; }
+.brandHome:focus-visible { outline:3px solid color-mix(in srgb, var(--accent) 52%, transparent); outline-offset:3px; }

@@ -4,7 +4,7 @@ function go(page) {
     if (!location.pathname.endsWith('/plan.html')) location.href = 'plan.html';
     return;
   }
-  const planningViews = { calendar: 'calendar', reminders: 'reminders', planner: 'planner' };
+  const planningViews = { calendar: 'calendar', reminders: 'reminders', planner: 'planner', tasks: 'tasks' };
   const view = planningViews[page];
   if (view) {
     if (location.pathname.endsWith('/plan.html')) window.PlanHub?.show(view);
@@ -36,11 +36,11 @@ const AppIcon = {
 };
 
 const Layout = {
-  TABS: [['today','home','Today'],['plan','calendar','Plan'],['ai','spark','Ask']],
-  MORE: [['journal','book','Journal'],['cart','cart','Price tracker'],['expenses','wallet','Expenses'],['favorites','star','Favorites'],['groups','users','Groups'],['voice','mic','Voice'],['settings','settings','Settings']],
+  TABS: [['today','home','Today'],['plan','calendar','Plan'],['ai','spark','Assistant']],
+  MORE: [['groups','users','Groups'],['settings','settings','Personal & settings']],
   applyTheme() {
     const saved = localStorage.getItem('persona_theme');
-    const theme = saved || 'dark';
+    const theme = saved || 'light';
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     let themeMeta = document.querySelector('meta[name="theme-color"]');
@@ -49,7 +49,7 @@ const Layout = {
       themeMeta.name = 'theme-color';
       document.head.appendChild(themeMeta);
     }
-    themeMeta.content = theme === 'dark' ? '#171c19' : '#E7EEE5';
+    themeMeta.content = theme === 'dark' ? '#090916' : '#FFF7E8';
   },
   setTheme(theme) {
     localStorage.setItem('persona_theme', theme === 'dark' ? 'dark' : 'light');

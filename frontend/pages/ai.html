@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Ask Persona · Persona</title>
+<title>Assistant · Persona</title>
 <link rel="manifest" href="../manifest.json">
 <link rel="apple-touch-icon" href="../icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,13 +14,13 @@
 </head>
 <body>
 <div id="app"><div class="page" id="page-ai">
-<div class="chatWrap"><div id="chatLog"></div><div class="chatBar glass"><input id="chatIn" placeholder="Ask about your data…" autocomplete="off"><button class="btn primary" id="chatSend">➤</button></div></div>
+<main class="assistantPage"><header class="assistantWelcome"><span class="eyebrow">YOUR PLANNING COMPANION</span><h2 class="display">What’s on your mind?</h2><p class="muted">Ask what’s coming up, or speak to check your day. Persona answers from your calendar and reminders.</p><div class="assistantPrompts"><button class="assistantPrompt" data-prompt="What's up for today?">Today’s plan</button><button class="assistantPrompt" data-prompt="What about tomorrow?">Tomorrow</button><button class="assistantPrompt" data-prompt="Any exams coming up?">Upcoming exams</button></div></header><div class="chatWrap"><div id="chatLog" aria-live="polite"></div><div class="chatBar glass"><button class="btn assistantMic" id="assistantMic" aria-label="Ask by voice">🎙</button><input id="chatIn" placeholder="Ask or say what’s up for today…" autocomplete="off"><button class="btn primary" id="chatSend" aria-label="Send question">➤</button></div></div><div class="assistantActions"><button class="btn" id="openVoiceActions">Voice actions: music, calls, places and Meet</button></div></main>
 </div></div>
 <script src="../js/core/api.js"></script>
 <script src="../js/core/layout.js"></script>
 <script src="../js/core/ui.js"></script>
 <script src="../js/core/auth.js"></script>
 <script src="../js/pages/ai.js"></script>
-<script>Layout.chrome('app', 'Ask Persona', 'ai');</script>
+<script>Layout.chrome('app', 'Assistant', 'ai');</script>
 </body>
 </html>

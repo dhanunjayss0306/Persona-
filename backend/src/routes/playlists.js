@@ -81,8 +81,9 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 router.get('/', requireAuth, async (req, res) => {
-  const { data } = await supabase.from('playlists').select('*')
+  const { data, error } = await supabase.from('playlists').select('*')
     .eq('user_id', req.user.id).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });
 

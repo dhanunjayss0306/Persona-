@@ -1,9 +1,10 @@
 /* journal.js — the 3D rotating book. Entries are pages; themes re-skin the cover. */
-const Journal = { entries: [], idx: 0 };
+const Journal = { entries: [], idx: 0, loadError: '' };
 async function initJournal() {
   try {
     Journal.entries = await API.get('/api/journal');
-  } catch { Journal.entries = []; }
+    Journal.loadError = '';
+  } catch (error) { Journal.entries = []; Journal.loadError = error?.message || 'Request failed'; }
   Journal.idx = Math.max(0, Journal.entries.length - 1);
   document.getElementById('bookCount').textContent = Journal.entries.length + ' entries';
   Journal.show();
@@ -38,6 +39,11 @@ Journal.turn = function (direction) {
 Journal.show = function () {
   const p = document.getElementById('bookPage');
   const e = Journal.entries[Journal.idx];
+  if (Journal.loadError) {
+    p.innerHTML = `<h4>Could not load journal</h4><p class="muted">${UI.esc(Journal.loadError)}</p><button class="btn" id="journalRetry">Try again</button>`;
+    document.getElementById('journalRetry').onclick = () => initJournal();
+    return;
+  }
   if (!e) { p.innerHTML = '<h4>Empty book</h4><p class="muted">Tap “Write today” to begin.</p>'; return; }
   p.innerHTML = `<div class="mood">${UI.esc(e.mood || 'A NOTE TO SELF')} · ${UI.d(e.entry_date)}</div><h4>${UI.esc(e.title || 'Untitled')}</h4><p>${UI.esc(e.body)}</p>`;
 };

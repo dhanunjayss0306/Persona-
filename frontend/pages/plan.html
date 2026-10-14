@@ -20,6 +20,7 @@
       <button type="button" role="tab" data-view="calendar" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg><span>Calendar</span></button>
       <button type="button" role="tab" data-view="reminders" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Reminders</span></button>
       <button type="button" role="tab" data-view="planner" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v17H5zM8 8h8M8 12h8M8 16h5"/></svg><span>Study plan</span></button>
+      <button type="button" role="tab" data-view="tasks" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 12 5 5L20 6M4 5h5M4 19h5"/></svg><span>Tasks</span></button>
     </div>
     <p class="planHubNote">Calendar activities stay here. Add a reminder when you need an alert.</p>
 
@@ -30,13 +31,15 @@
           <button class="btn primary calendarAddTop" id="calAdd"><span aria-hidden="true">+</span> Add to calendar</button>
         </section>
         <section class="calendarMonthCard" aria-label="Monthly calendar">
-          <header class="calHead"><button class="iconBtn" id="calPrev" aria-label="Previous month">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext" aria-label="Next month">›</button></header>
+          <header class="calHead"><button class="iconBtn" id="calPrev" aria-label="Previous period">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext" aria-label="Next period">›</button><button class="btn sm" id="calToday">Today</button></header><div class="seg calendarViews" id="calViews" role="tablist" aria-label="Calendar view"><button data-cal-view="month" class="on">Month</button><button data-cal-view="week">Week</button><button data-cal-view="day">Day</button><button data-cal-view="agenda">Agenda</button></div>
           <div class="calGrid" id="calGrid"></div>
           <div class="calendarLegend"><span><i class="legendDot"></i> Things planned</span><span><i class="legendToday"></i> Today</span></div>
         </section>
         <section id="calDay" class="calendarDayPanel" aria-live="polite"></section>
       </main>
     </section>
+
+    <section class="planPane" id="page-tasks" role="tabpanel" hidden><main class="pad planInnerPage"><header class="planPaneHeading"><span class="eyebrow">KEEP THE NEXT STEP CLEAR</span><h2>Tasks</h2><p>Assignments and personal reminders in one list.</p></header><div class="seg" id="taskSeg" role="tablist" aria-label="Task status"><button data-task-filter="today" class="on">Today</button><button data-task-filter="upcoming">Upcoming</button><button data-task-filter="overdue">Overdue</button><button data-task-filter="done">Done</button></div><div id="taskList"></div><button class="fab" id="taskAdd" aria-label="Add task">+</button></main></section>
 
     <section class="planPane" id="page-reminders" role="tabpanel" hidden>
       <main class="pad planInnerPage">
@@ -49,6 +52,8 @@
     <section class="planPane" id="page-planner" role="tabpanel" hidden>
       <main class="pad planInnerPage">
         <header class="planPaneHeading"><span class="eyebrow">MAKE PROGRESS A LITTLE AT A TIME</span><h2>Study plan</h2><p>Add your topics and exam dates. Persona will map out study days and remind you at the time you choose.</p></header>
+        <section class="card monthPlanAssistant"><span class="eyebrow">AI SCHEDULE DRAFT</span><h3>Plan my month</h3><p class="muted sm">Describe your goals, deadlines, exams, and free time. Review and edit the draft before Persona saves anything.</p><label class="klabel" for="monthPlanPrompt">Your schedule</label><textarea id="monthPlanPrompt" maxlength="5000" placeholder="Next week, I want to learn Java and AI agents. I have a hackathon presentation to finish, and my semester starts next month."></textarea><div class="row"><button class="btn" id="monthPlanMic" type="button">🎙 Speak</button><button class="btn primary" id="monthPlanDraft" type="button">Draft my schedule</button></div><p class="muted sm" id="monthPlanStatus" aria-live="polite">Nothing is saved until you confirm the preview. If AI planning is unavailable, use the standard study planner below.</p><div id="monthPlanPreview"></div></section>
+        <div class="plannerIllustration card" aria-label="Study plan progress illustration"><div class="planOrbit" aria-hidden="true"><span>Focus</span><span>Rest</span><span>Review</span><i></i></div><div><span class="eyebrow">SMALL STEPS ADD UP</span><p class="muted sm">Your study blocks and exam dates appear together on the calendar.</p></div></div>
         <div id="planList"></div><button class="fab" id="planAdd" aria-label="Create study plan">+</button>
       </main>
     </section>

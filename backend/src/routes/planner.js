@@ -8,36 +8,9 @@
 const express = require('express');
 const supabase = require('../db');
 const { requireAuth } = require('../auth');
+const { buildDays } = require('../services/planBuilder');
 
 const router = express.Router();
-
-// Spread topics across days: simple round-robin, protecting fixed events
-// (exam days get revision blocks instead of new topics).
-function buildDays({ start, end, hoursPerDay, topics, leisure, events }) {
-  const eventDays = new Set((events || []).map((e) => e.event_date));
-  const days = [];
-  const cur = new Date(start);
-  const last = new Date(end);
-  let ti = 0;
-  while (cur <= last) {
-    const iso = cur.toISOString().slice(0, 10);
-    const blocks = [];
-    const mins = Math.round(hoursPerDay * 60);
-    if (eventDays.has(iso)) {
-      blocks.push({ title: 'Revision for ' + (events.find((e) => e.event_date === iso) || {}).title, minutes: Math.min(120, mins), kind: 'revision' });
-      if (mins > 120) blocks.push({ title: leisure || 'Free time', minutes: mins - 120, kind: 'leisure' });
-    } else {
-      const per = topics.length ? Math.floor(mins * 0.7 / topics.length) : 0;
-      topics.forEach((t) => blocks.push({ title: t, minutes: per, kind: 'study' }));
-      const used = per * topics.length;
-      if (mins - used > 0) blocks.push({ title: leisure || 'Free time', minutes: mins - used, kind: 'leisure' });
-      ti++;
-    }
-    days.push({ day: iso, blocks });
-    cur.setDate(cur.getDate() + 1);
-  }
-  return days;
-}
 
 // POST /api/planner/build {title, start_date, end_date, hours_per_day, topics[], leisure?}
 router.post('/build', requireAuth, async (req, res) => {
@@ -73,6 +46,67 @@ router.post('/build', requireAuth, async (req, res) => {
   }
 
   res.status(201).json({ plan, days: days.length, reminders: study_reminders?.length || 0 });
+});
+
+// AI month planning is a preview-only operation until the user confirms.
+router.post('/preview', requireAuth, async (req, res) => {
+  const prompt = String(req.body?.prompt || '').trim();
+  if (!prompt || prompt.length > 5000) return res.status(400).json({ error: 'Describe your schedule in 1 to 5,000 characters.' });
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'AI planning is not configured. Add OPENAI_API_KEY to the backend environment, or use the existing study planner.' });
+  const today = new Date().toISOString().slice(0, 10), uid = req.user.id;
+  const [calendar, reminders, exams] = await Promise.all([
+    supabase.from('calendar_events').select('title,event_date,start_time').eq('user_id', uid).gte('event_date', today).limit(100),
+    supabase.from('reminders').select('title,due_at,status').eq('user_id', uid).neq('status', 'done').gte('due_at', `${today}T00:00:00`).limit(100),
+    supabase.from('fixed_events').select('title,event_date,kind').eq('user_id', uid).gte('event_date', today).limit(100),
+  ]);
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', temperature: 0.2, response_format: { type: 'json_object' }, messages: [
+        { role: 'system', content: `Plan a realistic schedule. Today is ${today}. Respect existing commitments. Return JSON only: {"items":[{"title":"...","type":"study|assignment|project|exam|event","start_date":"YYYY-MM-DD","end_date":null,"due_date":null,"duration_minutes":60,"priority":"high|medium|low","notes":"..."}]}. Do not invent fixed commitments or dates in the past. Limit 80 items.` },
+        { role: 'user', content: JSON.stringify({ request: prompt, existing: { calendar: calendar.data || [], reminders: reminders.data || [], exams: exams.data || [] } }) },
+      ] }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error?.message || `Provider returned ${response.status}`);
+    const result = JSON.parse(payload.choices?.[0]?.message?.content || '{}');
+    const allowed = new Set(['study','assignment','project','exam','event']);
+    const items = (Array.isArray(result.items) ? result.items : []).slice(0, 80).filter((x) => x && typeof x.title === 'string' && x.title.trim() && allowed.has(x.type) && /^\d{4}-\d{2}-\d{2}$/.test(x.start_date) && Number(x.duration_minutes) > 0 && Number(x.duration_minutes) <= 1440 && ['high','medium','low'].includes(x.priority));
+    return res.json({ items, today });
+  } catch (error) {
+    console.error('[planner] preview failed:', error.message);
+    return res.status(502).json({ error: 'I could not create a plan preview. Nothing was saved; try again or use the standard study planner.' });
+  }
+});
+
+// Save only a user-reviewed AI plan. Existing records are never changed by preview.
+router.post('/confirm', requireAuth, async (req, res) => {
+  const items = req.body?.items, allowed = new Set(['study','assignment','project','exam','event']);
+  const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0,10) === value;
+  if (!Array.isArray(items) || !items.length || items.length > 80 || items.some((x) => !x || typeof x.title !== 'string' || !x.title.trim() || x.title.length > 160 || !allowed.has(x.type) || !validDate(x.start_date) || (x.due_date && !validDate(x.due_date)) || (x.end_date && !validDate(x.end_date)) || Number(x.duration_minutes) <= 0 || Number(x.duration_minutes) > 1440 || (x.notes && (typeof x.notes !== 'string' || x.notes.length > 500)))) return res.status(400).json({ error: 'Confirm a valid list of 1 to 80 reviewed items.' });
+  const uid = req.user.id, start = items.map((x) => x.start_date).sort()[0], end = items.map((x) => x.due_date || x.end_date || x.start_date).sort().at(-1);
+  const { data: plan, error } = await supabase.from('plans').insert({ user_id: uid, title: 'Persona month plan', start_date: start, end_date: end, hours_per_day: Math.max(1, ...items.map((x) => Number(x.duration_minutes) / 60)) }).select().single();
+  if (error) return res.status(500).json({ error: 'Could not save the plan.' });
+  const byDay = new Map();
+  for (const item of items) {
+    const date = item.due_date || item.start_date;
+    if (['exam','event'].includes(item.type)) {
+      const fixed = await supabase.from('fixed_events').insert({ user_id: uid, title: item.title, event_date: date, kind: item.type });
+      if (fixed.error) return res.status(500).json({ error: 'The plan exists, but a calendar date could not be saved. Check your plan before retrying.' });
+    }
+    else { const blocks = byDay.get(item.start_date) || []; blocks.push({ title: item.title, minutes: Number(item.duration_minutes), kind: item.type, priority: item.priority }); byDay.set(item.start_date, blocks); }
+    if (!['exam','event'].includes(item.type)) {
+      const calendarEvent = await supabase.from('calendar_events').insert({ user_id: uid, title: item.title, details: item.notes || '', event_date: date, start_time: item.type === 'study' ? '17:00:00' : '09:00:00' });
+      if (calendarEvent.error) return res.status(500).json({ error: 'The plan exists, but a calendar activity could not be saved. Check your plan before retrying.' });
+    }
+    if (['assignment','exam'].includes(item.type) || /hackathon/i.test(item.title)) {
+      const reminder = await supabase.from('reminders').insert({ user_id: uid, title: `${item.title} — due today`, details: item.notes || `You have a ${item.type} due today: ${item.title}`, type: 'nag', due_at: `${date}T09:00:00+05:30`, proof_required: false, status: 'pending' });
+      if (reminder.error) return res.status(500).json({ error: 'The plan exists, but a sticky reminder could not be saved. Check your reminders before retrying.' });
+    }
+  }
+  const days = [...byDay].map(([day, blocks]) => ({ plan_id: plan.id, day, blocks }));
+  if (days.length) { const saved = await supabase.from('plan_days').insert(days); if (saved.error) return res.status(500).json({ error: 'The plan was created, but study blocks could not be saved. Check the planner before retrying.' }); }
+  return res.status(201).json({ ok: true, plan_id: plan.id, saved: items.length });
 });
 
 // GET /api/planner — my plans with their days.

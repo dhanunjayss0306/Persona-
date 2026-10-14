@@ -12,10 +12,11 @@ Run order (Supabase → SQL Editor): `schema.sql` first, then each file in `migr
 | `plans` | 2–3 month study plans | `title`, `start_date`, `end_date`, `hours_per_day`, `topics` |
 | `plan_days` | Day-by-day blocks inside a plan | `plan_id`, `day`, `blocks` (json), `done` |
 | `fixed_events` | Exams with fixed dates (planner works around them) | `title`, `event_date` |
+| `calendar_events` | Calendar-only activities (never become reminders) | `user_id`, `title`, `event_date`, `start_time` |
 | `journal_entries` | Diary pages | `title`, `body`, `mood`, `entry_date`, `share_token` |
 | `expenses` | UPI expense log | `amount`, `paid_to`, `upi_app`, `category`, `spent_at` |
-| `cart_items` | Tracked products + target prices | `name`, `url`, `shop`, `target_price`, `last_price` |
-| `price_history` | Every price check, for the sparkline | `cart_item_id`, `price`, `checked_at` |
+| `cart_items` | Tracked products + target prices | `name`, `url`, `shop`, `target_price`, `last_price`, `last_price_source` |
+| `price_history` | Verified INR price readings for the sparkline | `cart_item_id`, `price`, `checked_at`, `source` |
 | `playlists` | Spotify playlists the app created | `name`, `spotify_id`, `songs` (json) |
 | `groups` | Task groups | `name`, `created_by` |
 | `group_members` | Who belongs to which group | `group_id`, `user_id` |

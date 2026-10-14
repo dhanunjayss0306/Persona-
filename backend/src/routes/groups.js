@@ -29,10 +29,12 @@ router.post('/', requireAuth, async (req, res) => {
 
 // GET /api/groups — groups I'm in.
 router.get('/', requireAuth, async (req, res) => {
-  const { data: memberships } = await supabase.from('group_members').select('group_id').eq('user_id', req.user.id);
+  const { data: memberships, error: membershipError } = await supabase.from('group_members').select('group_id').eq('user_id', req.user.id);
+  if (membershipError) return res.status(500).json({ error: membershipError.message });
   const ids = (memberships || []).map((m) => m.group_id);
   if (!ids.length) return res.json([]);
-  const { data } = await supabase.from('groups').select('*, group_members(user_id), group_tasks(*)').in('id', ids);
+  const { data, error } = await supabase.from('groups').select('*, group_members(user_id), group_tasks(*)').in('id', ids);
+  if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });
 

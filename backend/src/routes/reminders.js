@@ -12,9 +12,13 @@ const { requireAuth } = require('../auth');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch((error) => {
+  console.error('[reminders] request failed:', error.message);
+  if (!res.headersSent) res.status(502).json({ error: 'Reminder database request failed. Check the backend connection and logs.' });
+});
 
 // POST /api/reminders  {title, details?, type: 'once'|'nag', due_at, proof_required?}
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, asyncRoute(async (req, res) => {
   const { title, details, type, due_at, proof_required } = req.body || {};
   if (!title || !type || !due_at) return res.status(400).json({ error: 'title, type, due_at required' });
   if (!['once', 'nag'].includes(type)) return res.status(400).json({ error: "type must be 'once' or 'nag'" });
@@ -25,16 +29,16 @@ router.post('/', requireAuth, async (req, res) => {
   }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
-});
+}));
 
 // GET /api/reminders?status=pending — list mine, newest first.
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, asyncRoute(async (req, res) => {
   let q = supabase.from('reminders').select('*').eq('user_id', req.user.id).order('due_at');
   if (req.query.status) q = q.eq('status', req.query.status);
   const { data, error } = await q;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
-});
+}));
 
 // GET /api/reminders/:id
 router.get('/:id', requireAuth, async (req, res) => {
@@ -52,6 +56,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
   for (const k of allowed) if (req.body?.[k] !== undefined) patch[k] = req.body[k];
   if (patch.type && !['once', 'nag'].includes(patch.type)) {
     return res.status(400).json({ error: "type must be 'once' or 'nag'" });
+  }
+  if (patch.status && !['pending', 'ringing', 'notified', 'done'].includes(patch.status)) {
+    return res.status(400).json({ error: 'status must be pending, ringing, notified, or done' });
   }
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
   const { data, error } = await supabase.from('reminders').update(patch)

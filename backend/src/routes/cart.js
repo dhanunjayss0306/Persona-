@@ -6,27 +6,28 @@
 const express = require('express');
 const supabase = require('../db');
 const { requireAuth } = require('../auth');
-const { fetchPrice } = require('../services/price');
+const { fetchPrice, supportedProductUrl } = require('../services/price');
 
 const router = express.Router();
 
 function shopOf(url) {
-  const u = (url || '').toLowerCase();
-  if (u.includes('amazon')) return 'amazon';
-  if (u.includes('flipkart')) return 'flipkart';
-  if (u.includes('croma')) return 'croma';
-  if (u.includes('myntra')) return 'myntra';
-  if (u.includes('ajio')) return 'ajio';
-  return 'other';
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return ['amazon.in', 'flipkart.com', 'croma.com', 'myntra.com', 'ajio.com']
+      .find((domain) => host === domain || host.endsWith(`.${domain}`))?.split('.')[0] || 'other';
+  } catch { return 'other'; }
 }
 
 // POST /api/cart {name, url, target_price?}
 router.post('/', requireAuth, async (req, res) => {
   const { name, url, target_price } = req.body || {};
   if (!name || !url) return res.status(400).json({ error: 'name and url required' });
+  if (!supportedProductUrl(url)) return res.status(400).json({ error: 'Use a secure product link from Amazon India, Flipkart, Croma, Myntra, or Ajio.' });
+  const target = target_price == null || target_price === '' ? null : Number(target_price);
+  if (target !== null && (!Number.isFinite(target) || target <= 0)) return res.status(400).json({ error: 'Target price must be greater than zero.' });
   const { data, error } = await supabase.from('cart_items').insert({
     user_id: req.user.id, name, url, shop: shopOf(url),
-    target_price: target_price ? Number(target_price) : null,
+    target_price: target,
   }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
@@ -69,12 +70,13 @@ router.post('/:id/check', requireAuth, async (req, res) => {
   if (!item) return res.status(404).json({ error: 'Not found' });
 
   const price = await fetchPrice(item.url);
-  if (price == null) return res.status(502).json({ error: 'Could not read price (shop may block automated checks)' });
+  if (price == null) return res.status(502).json({ error: 'Could not verify a current INR product price from this page. Nothing was saved; the retailer may block checks or omit price metadata.' });
 
-  await supabase.from('price_history').insert({ cart_item_id: item.id, price });
+  const { error: historyError } = await supabase.from('price_history').insert({ cart_item_id: item.id, price, source: 'verified' });
+  if (historyError) return res.status(500).json({ error: 'Price was verified but could not be saved. Apply the latest database migration.' });
   const hit = item.target_price && price <= Number(item.target_price);
   await supabase.from('cart_items').update({
-    last_price: price, last_checked_at: new Date().toISOString(),
+    last_price: price, last_price_source: 'verified', last_checked_at: new Date().toISOString(),
     alert_sent: hit ? true : item.alert_sent,
   }).eq('id', item.id);
 
@@ -95,8 +97,9 @@ router.get('/:id/history', requireAuth, async (req, res) => {
     .eq('id', req.params.id).eq('user_id', req.user.id).maybeSingle();
   if (itemError) return res.status(500).json({ error: itemError.message });
   if (!item) return res.status(404).json({ error: 'Not found' });
-  const { data } = await supabase.from('price_history').select('price,checked_at')
-    .eq('cart_item_id', item.id).order('checked_at');
+  const { data, error } = await supabase.from('price_history').select('price,checked_at')
+    .eq('cart_item_id', item.id).eq('source', 'verified').order('checked_at');
+  if (error) return res.status(500).json({ error: 'Price history needs the latest database migration.' });
   res.json(data || []);
 });
 

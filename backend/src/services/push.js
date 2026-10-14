@@ -32,20 +32,28 @@ async function sendToUser(userId, title, body, data = {}) {
     console.log(`[push:skipped] ${title} — ${body}`);
     return false;
   }
-  const { data: devices } = await supabase.from('devices').select('fcm_token').eq('user_id', userId);
-  const tokens = (devices || []).map((d) => d.fcm_token);
-  if (!tokens.length) {
-    console.log(`[push] no devices registered for user ${userId}`);
+  try {
+    const { data: devices, error } = await supabase.from('devices').select('fcm_token').eq('user_id', userId);
+    if (error) throw error;
+    const tokens = (devices || []).map((d) => d.fcm_token);
+    if (!tokens.length) {
+      console.log(`[push] no devices registered for user ${userId}; reminder will retry`);
+      return false;
+    }
+    const msg = {
+      notification: { title, body },
+      data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
+      webpush: { headers: { Urgency: 'high' }, notification: { title, body, requireInteraction: true, vibrate: [250, 120, 250], tag: data.reminder_id || 'persona-reminder', renotify: true, actions: data.reminder_id ? [{ action: 'done', title: 'Done' }, { action: 'snooze', title: 'Snooze 10m' }] : [] } },
+      android: { priority: 'high', notification: { sound: 'default', channelId: 'persona-reminders' } },
+      tokens,
+    };
+    const res = await admin.messaging().sendEachForMulticast(msg);
+    console.log(`[push] sent to ${res.successCount}/${tokens.length} devices`);
+    return res.successCount > 0;
+  } catch (error) {
+    console.error('[push] delivery failed:', error.message);
     return false;
   }
-  const msg = {
-    notification: { title, body },
-    data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
-    tokens,
-  };
-  const res = await admin.messaging().sendEachForMulticast(msg);
-  console.log(`[push] sent to ${res.successCount}/${tokens.length} devices`);
-  return res.successCount > 0;
 }
 
 module.exports = { sendToUser, isReady: () => ready };

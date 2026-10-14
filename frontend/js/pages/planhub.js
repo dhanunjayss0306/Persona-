@@ -1,7 +1,7 @@
 /* One calm planning home with focused Calendar, Reminders, and Study plan views. */
 const PlanHub = {
   initialized: new Set(),
-  valid: ['calendar', 'reminders', 'planner'],
+  valid: ['calendar', 'reminders', 'planner', 'tasks'],
   show(view, updateUrl = true) {
     if (!this.valid.includes(view)) view = 'calendar';
     document.querySelectorAll('#planHub [data-view]').forEach((button) => {
@@ -17,6 +17,7 @@ const PlanHub = {
       if (view === 'calendar') initCalendar();
       if (view === 'reminders') initReminders();
       if (view === 'planner') initPlanner();
+      if (view === 'tasks') initTasks();
     }
   },
   init() {

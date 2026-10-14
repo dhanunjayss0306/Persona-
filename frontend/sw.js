@@ -1,17 +1,17 @@
 /* sw.js — Persona service worker: app-shell cache + FCM push. */
 importScripts('./firebase-config.js');
 const firebaseConfig = self.PERSONA_FIREBASE_CONFIG;
-const CACHE = 'persona-v11';
+const CACHE = 'persona-v14';
 const SHELL = ['./', './index.html', './manifest.json',
-  './css/tokens.css', './css/components.css', './css/journal.css',
+  './css/tokens.css', './css/components.css',
   './assets/logo-mark.png', './assets/ambient-linework.svg', './assets/ambient-botanical.svg', './firebase-config.js',
   './js/core/api.js', './js/core/layout.js', './js/core/ui.js', './js/core/auth.js', './js/pages/settings.js',
   './pages/today.html', './pages/plan.html', './pages/reminders.html', './pages/calendar.html', './pages/ai.html', './pages/voice.html',
-  './pages/settings.html', './pages/cart.html', './pages/journal.html', './pages/planner.html',
-  './pages/expenses.html', './pages/favorites.html', './pages/groups.html', './pages/onboarding.html',
+  './pages/settings.html', './pages/planner.html',
+  './pages/groups.html', './pages/onboarding.html',
   './js/pages/today.js', './js/pages/planhub.js', './js/pages/reminders.js', './js/pages/calendar.js', './js/pages/ai.js', './js/pages/voice.js',
-  './js/pages/cart.js', './js/pages/journal.js', './js/pages/planner.js', './js/pages/expenses.js',
-  './js/pages/favorites.js', './js/pages/groups.js', './js/pages/onboarding.js'];
+  './js/pages/planner.js',
+  './js/pages/groups.js', './js/pages/onboarding.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -44,13 +44,21 @@ try {
       const n = payload.notification || {};
       self.registration.showNotification(n.title || 'Persona', {
         body: n.body || '', icon: './icons/icon-192.png', badge: './icons/icon-192.png',
-        data: payload.data || {},
+        data: payload.data || {}, requireInteraction: true, vibrate: [250, 120, 250],
+        tag: payload.data?.reminder_id || 'persona-reminder', renotify: true,
+        actions: payload.data?.reminder_id ? [{ action: 'done', title: 'Done' }, { action: 'snooze', title: 'Snooze 10m' }] : [],
       });
     });
   }
 } catch (e) { /* FCM not configured yet — pushes skipped */ }
 
 self.addEventListener('notificationclick', (e) => {
+  const reminderId = e.notification.data?.reminder_id;
+  if (reminderId && ['done', 'snooze'].includes(e.action)) {
+    e.notification.close();
+    e.waitUntil(clients.openWindow(`./pages/plan.html?stickyAction=${e.action}&reminderId=${encodeURIComponent(reminderId)}#tasks`));
+    return;
+  }
   e.notification.close();
-  e.waitUntil(clients.openWindow('./index.html'));
+  e.waitUntil(clients.openWindow(reminderId ? './pages/plan.html#tasks' : './index.html'));
 });

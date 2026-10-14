@@ -86,6 +86,17 @@ create table if not exists fixed_events (
   created_at timestamptz default now()
 );
 
+-- Calendar-only activities. They do not create or behave like reminders.
+create table if not exists calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade,
+  title text not null,
+  details text,
+  event_date date not null,
+  start_time time not null,
+  created_at timestamptz default now()
+);
+
 -- ---------- JOURNAL ----------
 create table if not exists journal_entries (
   id uuid primary key default gen_random_uuid(),
@@ -120,6 +131,7 @@ create table if not exists cart_items (
   shop text,                 -- amazon / flipkart / croma
   target_price numeric,
   last_price numeric,
+  last_price_source text not null default 'legacy',
   last_checked_at timestamptz,
   alert_sent boolean default false,
   created_at timestamptz default now()
@@ -129,7 +141,8 @@ create table if not exists price_history (
   id uuid primary key default gen_random_uuid(),
   cart_item_id uuid references cart_items(id) on delete cascade,
   price numeric not null,
-  checked_at timestamptz default now()
+  checked_at timestamptz default now(),
+  source text not null default 'legacy'
 );
 
 -- ---------- PLAYLISTS ----------
