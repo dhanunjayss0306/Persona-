@@ -1,15 +1,15 @@
-# Database — what each table is for
+﻿# Database â€” what each table is for
 
-Run order (Supabase → SQL Editor): `schema.sql` first, then each file in `migrations/` in number order.
+Run order (Supabase â†’ SQL Editor): `schema.sql` first, then each file in `migrations/` in number order.
 
 | Table | What it stores | Key columns |
 |---|---|---|
-| `users` | Accounts — email/phone + password, or Google login | `email`, `phone`, `password_hash`, `google_id`, `onboarding` (json) |
+| `users` | Accounts â€” email/phone + password, or Google login | `email`, `phone`, `password_hash`, `google_id`, `onboarding` (json) |
 | `devices` | Push-notification tokens, one row per device | `user_id`, `fcm_token` |
 | `contacts` | Phone contacts for "call X" voice action | `user_id`, `name`, `phone` |
-| `reminders` | One-time + strict (nag) reminders | `title`, `type` (once/nag), `due_at`, `status` |
-| `proofs` | Photo/voice/text proof that stops a strict reminder | `reminder_id`, `kind`, `file_url`, `text` |
-| `plans` | 2–3 month study plans | `title`, `start_date`, `end_date`, `hours_per_day`, `topics` |
+| `reminders` | Once, Sticky (nag), and plain tasks | `title`, `type` (once/nag), `due_at`, `status` |
+| `proofs` | Optional photo/voice/text evidence | `reminder_id`, `kind`, `file_url`, `text` |
+| `plans` | 2â€“3 month study plans | `title`, `start_date`, `end_date`, `hours_per_day`, `topics` |
 | `plan_days` | Day-by-day blocks inside a plan | `plan_id`, `day`, `blocks` (json), `done` |
 | `fixed_events` | Exams with fixed dates (planner works around them) | `title`, `event_date` |
 | `calendar_events` | Calendar-only activities (never become reminders) | `user_id`, `title`, `event_date`, `start_time` |

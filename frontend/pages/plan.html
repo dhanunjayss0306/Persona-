@@ -31,7 +31,7 @@
           <button class="btn primary calendarAddTop" id="calAdd"><span aria-hidden="true">+</span> Add to calendar</button>
         </section>
         <section class="calendarMonthCard" aria-label="Monthly calendar">
-          <header class="calHead"><button class="iconBtn" id="calPrev" aria-label="Previous period">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext" aria-label="Next period">›</button><button class="btn sm" id="calToday">Today</button></header><div class="seg calendarViews" id="calViews" role="tablist" aria-label="Calendar view"><button data-cal-view="month" class="on">Month</button><button data-cal-view="week">Week</button><button data-cal-view="day">Day</button><button data-cal-view="agenda">Agenda</button></div>
+          <header class="calHead"><button class="iconBtn" id="calPrev" aria-label="Previous period">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext" aria-label="Next period">›</button></header><div class="seg calendarViews" id="calViews" role="tablist" aria-label="Calendar view"><button data-cal-view="month" class="on">Month</button><button data-cal-view="week">Week</button><button data-cal-view="day">Day</button><button data-cal-view="agenda">Agenda</button></div>
           <div class="calGrid" id="calGrid"></div>
           <div class="calendarLegend"><span><i class="legendDot"></i> Things planned</span><span><i class="legendToday"></i> Today</span></div>
         </section>
@@ -44,7 +44,7 @@
     <section class="planPane" id="page-reminders" role="tabpanel" hidden>
       <main class="pad planInnerPage">
         <header class="planPaneHeading"><span class="eyebrow">THINGS THAT NEED A NUDGE</span><h2>Reminders</h2><p>Set your own reminders here. Study reminders can be added automatically from a plan.</p></header>
-        <div class="seg" id="remSeg"><button data-f="all" class="on">All</button><button data-f="once">Once</button><button data-f="nag">Strict</button></div>
+        <div class="seg" id="remSeg"><button data-f="all" class="on">All</button><button data-f="once">Once</button><button data-f="nag">Sticky</button></div>
         <div id="remList"></div><button class="fab" id="remAdd" aria-label="Add reminder">+</button>
       </main>
     </section>

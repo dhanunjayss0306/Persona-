@@ -13,32 +13,35 @@ const jwt = require('jsonwebtoken');
 const supabase = require('../db');
 const { requireAuth } = require('../auth');
 const { parseToItems, stamp } = require('../services/nlp');
+const { DEFAULT_TIMEZONE } = require('../services/timezone');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // POST /api/voice/parse {text} — "Tomorrow I have a meeting at 8:00, a class
 // from 9:00 to 10:15, and an assignment to submit" → creates arranged items.
-// Assignments → strict (nag) reminders; meetings/classes → calendar reminders.
+// Assignments → Sticky reminders; voice transcripts are never copied into nag text.
 // Always returns what it understood so the app can show a confirm screen.
 router.post('/parse', requireAuth, async (req, res) => {
   const { text, dry_run } = req.body || {};
   if (typeof text !== 'string' || !text.trim()) return res.status(400).json({ error: 'text required' });
   if (text.length > 4000) return res.status(413).json({ error: 'Voice notes must be under 4,000 characters' });
 
-  const { date, items } = parseToItems(text);
+  const { data: profile } = await supabase.from('users').select('timezone').eq('id',req.user.id).maybeSingle();
+  const timezone=profile?.timezone||DEFAULT_TIMEZONE;
+  const { date, items } = parseToItems(text,timezone);
   const created = [];
   if (!dry_run) {
     for (const it of items) {
       const isWork = it.kind === 'assignment';
-      const due_at = stamp(date, it.start, isWork ? 23 - 1 : 9); // assignments due 22:00 if no time
+      const due_at = stamp(date, it.start, isWork ? 22 : 9, timezone); // assignments due 22:00 if no time
       const title = it.end != null
         ? `${it.title} (${Math.floor(it.start / 60)}:${String(it.start % 60).padStart(2, '0')}–${Math.floor(it.end / 60)}:${String(it.end % 60).padStart(2, '0')})`
         : it.title;
       const { data, error } = await supabase.from('reminders').insert({
         user_id: req.user.id,
         title: title.charAt(0).toUpperCase() + title.slice(1),
-        details: `From voice: "${text}"`,
+        details: isWork ? null : `Added from voice input.`,
         type: isWork ? 'nag' : 'once',
         due_at,
       }).select().single();
@@ -61,26 +64,27 @@ router.post('/parse', requireAuth, async (req, res) => {
 // ML and not implemented — the sample personalizes, it doesn't lock.
 router.post('/profile', requireAuth, upload.single('sample'), async (req, res) => {
   const { wake_word } = req.body || {};
-  let sample_url = null;
+  let sample_path = null;
   if (req.file) {
     const path = `${req.user.id}/sample-${Date.now()}.webm`;
     const { error } = await supabase.storage.from('voice-samples').upload(path, req.file.buffer, {
       contentType: req.file.mimetype, upsert: true,
     });
     if (error) return res.status(500).json({ error: `Voice sample upload failed: ${error.message}` });
-    sample_url = supabase.storage.from('voice-samples').getPublicUrl(path).data.publicUrl;
+    sample_path = path;
   }
   const row = { user_id: req.user.id, wake_word: wake_word || 'Hey Persona' };
-  if (sample_url) row.sample_url = sample_url;
+  if (sample_path) row.sample_path = sample_path;
   const { error } = await supabase.from('voice_profiles').upsert(row, { onConflict: 'user_id' });
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ ok: true, wake_word: row.wake_word, sample_saved: !!sample_url });
+  res.json({ ok: true, wake_word: row.wake_word, sample_saved: !!sample_path });
 });
 
 router.get('/profile', requireAuth, async (req, res) => {
-  const { data } = await supabase.from('voice_profiles').select('wake_word,sample_url')
+  const { data } = await supabase.from('voice_profiles').select('wake_word,sample_path')
     .eq('user_id', req.user.id).maybeSingle();
-  res.json(data || { wake_word: 'Hey Persona', sample_url: null });
+  const signed = data?.sample_path ? await supabase.storage.from('voice-samples').createSignedUrl(data.sample_path, 300) : null;
+  res.json({ wake_word:data?.wake_word||'Hey Persona', sample_url:signed?.data?.signedUrl||null });
 });
 
 // ---------- contacts ----------
@@ -120,10 +124,14 @@ router.get('/jiosaavn', requireAuth, (req, res) => {
 });
 
 // ---------- Google Meet via Calendar ----------
-const googleTokens = new Map(); // Move to encrypted persistent storage before running multiple backend instances.
-const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-me';
+const jwtSecret = process.env.JWT_SECRET;
+const crypto = require('crypto');
+function encryptTokens(value) { const key=Buffer.from(process.env.OAUTH_ENCRYPTION_KEY||'','hex'); if(key.length!==32) throw new Error('OAUTH_ENCRYPTION_KEY must be 64 hex characters'); const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',key,iv),data=Buffer.concat([cipher.update(JSON.stringify(value)),cipher.final(),cipher.getAuthTag()]); return `${iv.toString('hex')}:${data.toString('hex')}`; }
+function decryptTokens(value) { const key=Buffer.from(process.env.OAUTH_ENCRYPTION_KEY||'','hex'); if(key.length!==32) throw new Error('OAUTH_ENCRYPTION_KEY must be 64 hex characters'); const [ivHex,dataHex]=value.split(':'),data=Buffer.from(dataHex,'hex'),decipher=crypto.createDecipheriv('aes-256-gcm',key,Buffer.from(ivHex,'hex'));decipher.setAuthTag(data.subarray(-16));return JSON.parse(Buffer.concat([decipher.update(data.subarray(0,-16)),decipher.final()]).toString()); }
+async function saveGoogle(userId, tokens) { const {data:old}=await supabase.from('oauth_tokens').select('encrypted_tokens').eq('user_id',userId).eq('provider','google').maybeSingle(); let previous={};try{if(old)previous=decryptTokens(old.encrypted_tokens);}catch{} const encrypted_tokens=encryptTokens({...tokens,refresh_token:tokens.refresh_token||previous.refresh_token}); const {error}=await supabase.from('oauth_tokens').upsert({user_id:userId,provider:'google',encrypted_tokens},{onConflict:'user_id,provider'}); if(error)throw error; }
+async function loadGoogle(userId) { const {data,error}=await supabase.from('oauth_tokens').select('encrypted_tokens').eq('user_id',userId).eq('provider','google').maybeSingle(); if(error)throw error; return data?decryptTokens(data.encrypted_tokens):null; }
 
-router.get('/google/status', requireAuth, (req, res) => res.json({ connected: googleTokens.has(req.user.id) }));
+router.get('/google/status', requireAuth, async (req, res) => { try { res.json({ connected:!!(await loadGoogle(req.user.id)) }); } catch(e) { res.status(503).json({error:e.message}); } });
 
 router.post('/google/login-url', requireAuth, (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
@@ -160,27 +168,26 @@ router.get('/google/callback', async (req, res) => {
     });
     const tokens = await response.json();
     if (!response.ok || !tokens.access_token) return res.status(400).send('Google login failed. Return to Persona and try again.');
-    const previous = googleTokens.get(identity.sub);
-    googleTokens.set(identity.sub, { ...tokens, refresh_token: tokens.refresh_token || previous?.refresh_token, expires_at: Date.now() + Number(tokens.expires_in || 3600) * 1000 });
+    await saveGoogle(identity.sub, { ...tokens, expires_at: Date.now() + Number(tokens.expires_in || 3600) * 1000 });
     res.send('<!doctype html><meta name="viewport" content="width=device-width"><title>Connected · Persona</title><main style="font:16px system-ui;max-width:420px;margin:15vh auto;padding:24px;color:#172033"><h1>Google Calendar connected</h1><p>You can close this tab and return to Persona.</p></main>');
   } catch { res.status(502).send('Could not reach Google. Return to Persona and try again.'); }
 });
 
 // POST /api/voice/meet {title?, minutes?} → creates event + Meet link.
 router.post('/meet', requireAuth, async (req, res) => {
-  let tok = googleTokens.get(req.user.id);
+  let tok; try { tok=await loadGoogle(req.user.id); } catch(e) { return res.status(503).json({error:e.message}); }
   if (!tok) return res.status(400).json({ error: 'Connect Google Calendar first.' });
   if (tok.expires_at < Date.now() + 30000) {
-    if (!tok.refresh_token) { googleTokens.delete(req.user.id); return res.status(401).json({ error: 'Google session expired. Connect Google Calendar again.' }); }
+    if (!tok.refresh_token) return res.status(401).json({ error: 'Google session expired. Connect Google Calendar again.' });
     try {
       const refresh = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, refresh_token: tok.refresh_token, grant_type: 'refresh_token' }),
       });
       const next = await refresh.json();
-      if (!refresh.ok || !next.access_token) { googleTokens.delete(req.user.id); return res.status(401).json({ error: 'Google session expired. Connect Google Calendar again.' }); }
+      if (!refresh.ok || !next.access_token) return res.status(401).json({ error: 'Google session expired. Connect Google Calendar again.' });
       tok = { ...tok, ...next, refresh_token: tok.refresh_token, expires_at: Date.now() + Number(next.expires_in || 3600) * 1000 };
-      googleTokens.set(req.user.id, tok);
+      await saveGoogle(req.user.id, tok);
     } catch { return res.status(502).json({ error: 'Could not refresh Google connection. Try again.' }); }
   }
   const { title, minutes } = req.body || {};

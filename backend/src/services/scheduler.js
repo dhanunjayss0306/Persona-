@@ -9,6 +9,7 @@
 const cron = require('node-cron');
 const supabase = require('../db');
 const { sendToUser } = require('./push');
+const { stickyNag } = require('./behavior');
 
 const NAG_INTERVAL_MIN = 5;
 
@@ -27,12 +28,7 @@ async function nagTick() {
     await supabase.from('reminders').update({ status: 'ringing' }).eq('id', r.id);
   }
   for (const r of [...(fresh || []), ...(nags || [])]) {
-    const nudges = [
-      r.details || `You still have this to do: ${r.title}`,
-      `A quick nudge: ${r.title} is still waiting for you.`,
-      `Make a little progress now: ${r.title}.`,
-    ];
-    const nudge = nudges[Math.floor(Date.now() / (NAG_INTERVAL_MIN * 60000)) % nudges.length];
+    const nudge = stickyNag(r.title, Math.floor(Date.now() / (NAG_INTERVAL_MIN * 60000)));
     const delivered = await sendToUser(r.user_id, '⏰ ' + r.title, nudge, { reminder_id: r.id });
     if (delivered) await supabase.from('reminders').update({ last_nagged_at: new Date().toISOString() }).eq('id', r.id);
   }

@@ -9,6 +9,8 @@ const express = require('express');
 const supabase = require('../db');
 const { requireAuth } = require('../auth');
 const { buildDays } = require('../services/planBuilder');
+const { DEFAULT_TIMEZONE, dateInZone, localDateTimeUtc } = require('../services/timezone');
+const { spreadMinutes } = require('../services/behavior');
 
 const router = express.Router();
 
@@ -53,7 +55,8 @@ router.post('/preview', requireAuth, async (req, res) => {
   const prompt = String(req.body?.prompt || '').trim();
   if (!prompt || prompt.length > 5000) return res.status(400).json({ error: 'Describe your schedule in 1 to 5,000 characters.' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'AI planning is not configured. Add OPENAI_API_KEY to the backend environment, or use the existing study planner.' });
-  const today = new Date().toISOString().slice(0, 10), uid = req.user.id;
+  const { data: profile } = await supabase.from('users').select('timezone').eq('id', req.user.id).maybeSingle();
+  const today = dateInZone(new Date(), profile?.timezone || DEFAULT_TIMEZONE), uid = req.user.id;
   const [calendar, reminders, exams] = await Promise.all([
     supabase.from('calendar_events').select('title,event_date,start_time').eq('user_id', uid).gte('event_date', today).limit(100),
     supabase.from('reminders').select('title,due_at,status').eq('user_id', uid).neq('status', 'done').gte('due_at', `${today}T00:00:00`).limit(100),
@@ -82,31 +85,31 @@ router.post('/preview', requireAuth, async (req, res) => {
 // Save only a user-reviewed AI plan. Existing records are never changed by preview.
 router.post('/confirm', requireAuth, async (req, res) => {
   const items = req.body?.items, allowed = new Set(['study','assignment','project','exam','event']);
-  const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0,10) === value;
-  if (!Array.isArray(items) || !items.length || items.length > 80 || items.some((x) => !x || typeof x.title !== 'string' || !x.title.trim() || x.title.length > 160 || !allowed.has(x.type) || !validDate(x.start_date) || (x.due_date && !validDate(x.due_date)) || (x.end_date && !validDate(x.end_date)) || Number(x.duration_minutes) <= 0 || Number(x.duration_minutes) > 1440 || (x.notes && (typeof x.notes !== 'string' || x.notes.length > 500)))) return res.status(400).json({ error: 'Confirm a valid list of 1 to 80 reviewed items.' });
-  const uid = req.user.id, start = items.map((x) => x.start_date).sort()[0], end = items.map((x) => x.due_date || x.end_date || x.start_date).sort().at(-1);
-  const { data: plan, error } = await supabase.from('plans').insert({ user_id: uid, title: 'Persona month plan', start_date: start, end_date: end, hours_per_day: Math.max(1, ...items.map((x) => Number(x.duration_minutes) / 60)) }).select().single();
-  if (error) return res.status(500).json({ error: 'Could not save the plan.' });
-  const byDay = new Map();
+  const validDate = (value) => { try { return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0,10) === value; } catch { return false; } };
+  if (!Array.isArray(items) || !items.length || items.length > 80 || items.some((x) => !x || typeof x.title !== 'string' || !x.title.trim() || x.title.length > 160 || !allowed.has(x.type) || !validDate(x.start_date) || (x.due_date && (!validDate(x.due_date)||x.due_date<x.start_date)) || (x.end_date && !validDate(x.end_date)) || ((x.end_date||x.due_date) && (x.end_date||x.due_date) < x.start_date) || Number(x.duration_minutes) <= 0 || Number(x.duration_minutes) > 1440 || (x.notes && (typeof x.notes !== 'string' || x.notes.length > 500)))) return res.status(400).json({ error: 'Confirm a valid list of 1 to 80 reviewed items.' });
+  const uid = req.user.id, start = items.map((x) => x.start_date).sort()[0], end = items.map((x) => x.end_date || x.due_date || x.start_date).sort().at(-1);
+  const { data: profile } = await supabase.from('users').select('timezone').eq('id', uid).maybeSingle();
+  const timezone=profile?.timezone||DEFAULT_TIMEZONE;
+  const byDay = new Map(), calendarRows = [], fixedEvents = [], reminderRows = [];
   for (const item of items) {
-    const date = item.due_date || item.start_date;
+    const date = item.due_date || item.end_date || item.start_date;
+    const endDate = item.end_date || item.due_date || item.start_date;
     if (['exam','event'].includes(item.type)) {
-      const fixed = await supabase.from('fixed_events').insert({ user_id: uid, title: item.title, event_date: date, kind: item.type });
-      if (fixed.error) return res.status(500).json({ error: 'The plan exists, but a calendar date could not be saved. Check your plan before retrying.' });
+      fixedEvents.push({ title:item.title, event_date:date, kind:item.type });
     }
-    else { const blocks = byDay.get(item.start_date) || []; blocks.push({ title: item.title, minutes: Number(item.duration_minutes), kind: item.type, priority: item.priority }); byDay.set(item.start_date, blocks); }
-    if (!['exam','event'].includes(item.type)) {
-      const calendarEvent = await supabase.from('calendar_events').insert({ user_id: uid, title: item.title, details: item.notes || '', event_date: date, start_time: item.type === 'study' ? '17:00:00' : '09:00:00' });
-      if (calendarEvent.error) return res.status(500).json({ error: 'The plan exists, but a calendar activity could not be saved. Check your plan before retrying.' });
+    const spread = ['study','project'].includes(item.type), distribution = spread ? spreadMinutes(item.start_date, endDate, Number(item.duration_minutes)) : [{day:date,minutes:Number(item.duration_minutes)}], dates=distribution.map(x=>x.day);
+    if (spread) {
+      distribution.forEach(({day,minutes}) => { const blocks=byDay.get(day)||[]; blocks.push({ title:item.title, minutes, kind:item.type, priority:item.priority }); byDay.set(day,blocks); });
     }
+    if (!['exam'].includes(item.type)) dates.forEach((day) => calendarRows.push({ title:item.title, details:item.notes||'', event_date:day, start_time:item.type==='study'?'17:00:00':'09:00:00' }));
     if (['assignment','exam'].includes(item.type) || /hackathon/i.test(item.title)) {
-      const reminder = await supabase.from('reminders').insert({ user_id: uid, title: `${item.title} — due today`, details: item.notes || `You have a ${item.type} due today: ${item.title}`, type: 'nag', due_at: `${date}T09:00:00+05:30`, proof_required: false, status: 'pending' });
-      if (reminder.error) return res.status(500).json({ error: 'The plan exists, but a sticky reminder could not be saved. Check your reminders before retrying.' });
+      reminderRows.push({ title:item.title, details:`You have an assignment due today: ${item.title}`, type:'nag', due_at:localDateTimeUtc(date,9,0,timezone) });
     }
   }
-  const days = [...byDay].map(([day, blocks]) => ({ plan_id: plan.id, day, blocks }));
-  if (days.length) { const saved = await supabase.from('plan_days').insert(days); if (saved.error) return res.status(500).json({ error: 'The plan was created, but study blocks could not be saved. Check the planner before retrying.' }); }
-  return res.status(201).json({ ok: true, plan_id: plan.id, saved: items.length });
+  const dayRows = [...byDay].map(([day, blocks]) => ({ day, blocks }));
+  const { data: planId, error } = await supabase.rpc('confirm_persona_plan', { p_user:uid, p_plan:{title:'Persona month plan',start_date:start,end_date:end,hours_per_day:Math.max(1,...items.map(x=>Number(x.duration_minutes)/60)),fixed_events:fixedEvents}, p_days:dayRows, p_events:calendarRows, p_reminders:reminderRows });
+  if (error) return res.status(500).json({ error: 'Could not save the plan. No plan data was committed; check that migration 005 is installed.' });
+  return res.status(201).json({ ok:true, plan_id:planId, saved:items.length });
 });
 
 // GET /api/planner — my plans with their days.

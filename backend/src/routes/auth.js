@@ -5,6 +5,8 @@ const { signToken, requireAuth, hashPassword, checkPassword } = require('../auth
 const { sendToUser, isReady: pushReady } = require('../services/push');
 
 const router = express.Router();
+const signinAttempts = new Map();
+function limited(req, res) { const key = req.ip || 'unknown', now = Date.now(), slot = signinAttempts.get(key) || { count: 0, until: now + 15 * 60_000 }; if (slot.until < now) { slot.count = 0; slot.until = now + 15 * 60_000; } slot.count++; signinAttempts.set(key, slot); return slot.count > 10 ? res.status(429).json({ error: 'Too many sign-in attempts. Try again later.' }) : null; }
 
 // POST /api/auth/signup  {name, email, phone?, password, work?, field_of_study?, degrees?, bio?}
 router.post('/signup', async (req, res) => {
@@ -12,6 +14,7 @@ router.post('/signup', async (req, res) => {
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'name, email and password are required' });
   }
+  if (String(password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   if (!phone && !email) return res.status(400).json({ error: 'email or phone required' });
   const { data: existing } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
   if (existing) return res.status(409).json({ error: 'Email already registered' });
@@ -28,6 +31,7 @@ router.post('/signup', async (req, res) => {
 
 // POST /api/auth/signin  {login (email OR phone), password} — no OTP, as requested.
 router.post('/signin', async (req, res) => {
+  if (limited(req, res)) return;
   const { login, email, password } = req.body || {};
   const id = login || email;
   if (!id || !password) return res.status(400).json({ error: 'email/phone and password are required' });
@@ -101,9 +105,10 @@ router.post('/onboarding/answers', requireAuth, async (req, res) => {
 // PATCH /api/auth/me — update my profile.
 // {name?, phone?, work?, field_of_study?, degrees?, bio?}
 router.patch('/me', requireAuth, async (req, res) => {
-  const allowed = ['name', 'phone', 'work', 'field_of_study', 'degrees', 'bio'];
+  const allowed = ['name', 'phone', 'work', 'field_of_study', 'degrees', 'bio', 'timezone'];
   const patch = {};
   for (const k of allowed) if (req.body?.[k] !== undefined) patch[k] = req.body[k];
+  if (patch.timezone) { try { new Intl.DateTimeFormat('en', { timeZone: patch.timezone }); } catch { return res.status(400).json({ error: 'Invalid timezone.' }); } }
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
   const { data, error } = await supabase.from('users').update(patch)
     .eq('id', req.user.id).select('id,name,email,phone,work,field_of_study,degrees,bio').single();
@@ -114,7 +119,7 @@ router.patch('/me', requireAuth, async (req, res) => {
 // GET /api/auth/me — proves your token works.
 router.get('/me', requireAuth, async (req, res) => {
   const { data } = await supabase.from('users')
-    .select('id,name,email,phone,work,field_of_study,degrees,bio').eq('id', req.user.id).single();
+    .select('id,name,email,phone,work,field_of_study,degrees,bio,timezone').eq('id', req.user.id).single();
   res.json({ user: data || req.user });
 });
 

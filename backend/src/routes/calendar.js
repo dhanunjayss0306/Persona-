@@ -3,6 +3,7 @@
 const express = require('express');
 const supabase = require('../db');
 const { requireAuth } = require('../auth');
+const { DEFAULT_TIMEZONE, dateInZone, localDayStartUtc } = require('../services/timezone');
 
 const router = express.Router();
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch((error) => {
@@ -14,13 +15,15 @@ const calendarStorageMissing = (error) => ['PGRST205', '42P01'].includes(error?.
 const migrationMessage = 'Run backend/db/migrations/004_calendar_events.sql in Supabase SQL Editor to enable calendar activities.';
 
 router.get('/', requireAuth, asyncRoute(async (req, res) => {
-  const from = req.query.from || new Date().toISOString().slice(0, 10);
-  const to = req.query.to || new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const { data: profile } = await supabase.from('users').select('timezone').eq('id', req.user.id).maybeSingle();
+  const timezone = profile?.timezone || DEFAULT_TIMEZONE;
+  const from = req.query.from || dateInZone(new Date(), timezone);
+  const to = req.query.to || dateInZone(new Date(Date.now() + 30 * 864e5), timezone);
   const uid = req.user.id;
 
   const { data: reminders, error: reminderError } = await supabase.from('reminders')
     .select('id,title,details,type,status,due_at').eq('user_id', uid)
-    .gte('due_at', from).lte('due_at', to + 'T23:59:59').order('due_at');
+    .gte('due_at', localDayStartUtc(from, timezone)).lt('due_at', localDayStartUtc(dateInZone(new Date(new Date(`${to}T12:00:00Z`).getTime()+864e5), timezone), timezone)).order('due_at');
   if (reminderError) throw reminderError;
 
   const { data: plans, error: planError } = await supabase.from('plans').select('id').eq('user_id', uid);
@@ -47,7 +50,7 @@ router.get('/', requireAuth, asyncRoute(async (req, res) => {
     const key = date.slice(0, 10);
     (days[key] = days[key] || { date: key, reminders: [], plan_blocks: [], events: [] })[kind].push(item);
   };
-  (reminders || []).forEach((r) => put(r.due_at, 'reminders', r));
+  (reminders || []).forEach((r) => put(dateInZone(new Date(r.due_at), timezone), 'reminders', r));
   plan_days.forEach((d) => (d.blocks || []).forEach((b) => put(d.day, 'plan_blocks', { ...b, done: d.done, plan_id: d.plan_id, day: d.day })));
   (fixedEvents || []).forEach((e) => put(e.event_date, 'events', { ...e, source: 'fixed' }));
   (calendarEventsData || []).forEach((e) => put(e.event_date, 'events', { ...e, kind: 'activity', source: 'calendar' }));

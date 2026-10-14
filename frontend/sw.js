@@ -1,5 +1,6 @@
 /* sw.js — Persona service worker: app-shell cache + FCM push. */
 importScripts('./firebase-config.js');
+try { importScripts('./firebase-config.local.js'); } catch { /* Push stays disabled until local Firebase config is installed. */ }
 const firebaseConfig = self.PERSONA_FIREBASE_CONFIG;
 const CACHE = 'persona-v14';
 const SHELL = ['./', './index.html', './manifest.json',

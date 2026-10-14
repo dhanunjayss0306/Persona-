@@ -11,7 +11,8 @@ const supabase = require('../db');
 const { requireAuth } = require('../auth');
 
 const router = express.Router();
-const tokens = new Map(); // userId -> {access_token, refresh_token}; use DB/Redis in production.
+const jwt = require('jsonwebtoken');
+const stateSecret = () => process.env.JWT_SECRET;
 
 const CID = () => process.env.SPOTIFY_CLIENT_ID;
 const CSEC = () => process.env.SPOTIFY_CLIENT_SECRET;
@@ -20,13 +21,17 @@ const REDIR = () => process.env.SPOTIFY_REDIRECT_URI;
 router.get('/spotify/login', requireAuth, (req, res) => {
   if (!CID()) return res.status(500).json({ error: 'Spotify not configured (see .env)' });
   const scope = encodeURIComponent('playlist-modify-public playlist-modify-private');
+  const state = jwt.sign({ sub:req.user.id, purpose:'spotify' }, stateSecret(), { expiresIn:'10m' });
   res.redirect('https://accounts.spotify.com/authorize?' +
     `client_id=${CID()}&response_type=code&redirect_uri=${encodeURIComponent(REDIR())}` +
-    `&scope=${scope}&state=${req.user.id}`);
+    `&scope=${scope}&state=${encodeURIComponent(state)}`);
 });
+router.post('/spotify/login-url', requireAuth, (req,res)=>{if(!CID()||!REDIR())return res.status(503).json({error:'Spotify is not configured.'});const state=jwt.sign({sub:req.user.id,purpose:'spotify'},stateSecret(),{expiresIn:'10m'});const scope=encodeURIComponent('playlist-modify-public playlist-modify-private playlist-read-private');res.json({url:`https://accounts.spotify.com/authorize?client_id=${CID()}&response_type=code&redirect_uri=${encodeURIComponent(REDIR())}&scope=${scope}&state=${encodeURIComponent(state)}`});});
 
 router.get('/spotify/callback', async (req, res) => {
-  const { code, state } = req.query;
+  const { code } = req.query; let identity;
+  try { identity = jwt.verify(String(req.query.state||''), stateSecret()); } catch { return res.status(400).send('Spotify connection expired or invalid.'); }
+  if (identity.purpose !== 'spotify' || !identity.sub) return res.status(400).send('Invalid Spotify connection.');
   const r = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: {
@@ -37,21 +42,41 @@ router.get('/spotify/callback', async (req, res) => {
   });
   const tok = await r.json();
   if (!tok.access_token) return res.status(400).send('Spotify login failed');
-  tokens.set(state, tok);
+  const crypto = require('crypto'), key = Buffer.from(process.env.OAUTH_ENCRYPTION_KEY || '', 'hex');
+  if (key.length !== 32) return res.status(503).send('OAuth token encryption is not configured.');
+  tok.expires_at=Date.now()+Number(tok.expires_in||3600)*1000;
+  await storeSpotify(identity.sub,tok);
   res.send('Spotify connected! You can close this tab and go back to Persona.');
 });
 
 async function spotify(userId, path, method = 'GET', body) {
-  const t = tokens.get(userId);
+  const {data:row}=await supabase.from('oauth_tokens').select('encrypted_tokens').eq('user_id',userId).eq('provider','spotify').maybeSingle();
+  const crypto=require('crypto'),key=Buffer.from(process.env.OAUTH_ENCRYPTION_KEY||'','hex');
+  if(!row||key.length!==32) throw new Error('Connect Spotify first (or configure OAuth token encryption).');
+  const [ivHex,blobHex]=row.encrypted_tokens.split(':'),blob=Buffer.from(blobHex,'hex'),decipher=crypto.createDecipheriv('aes-256-gcm',key,Buffer.from(ivHex,'hex'));decipher.setAuthTag(blob.subarray(-16));
+  let t=JSON.parse(Buffer.concat([decipher.update(blob.subarray(0,-16)),decipher.final()]).toString());
+  if(t.expires_at<Date.now()+30000&&t.refresh_token){const refreshed=await fetch('https://accounts.spotify.com/api/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded',Authorization:'Basic '+Buffer.from(`${CID()}:${CSEC()}`).toString('base64')},body:new URLSearchParams({grant_type:'refresh_token',refresh_token:t.refresh_token})});const next=await refreshed.json();if(!refreshed.ok||!next.access_token)throw new Error('Spotify session expired. Connect Spotify again.');t={...t,...next,refresh_token:next.refresh_token||t.refresh_token,expires_at:Date.now()+Number(next.expires_in||3600)*1000};await storeSpotify(userId,t);}
   if (!t) throw new Error('Connect Spotify first (GET /api/playlists/spotify/login)');
   const r = await fetch(`https://api.spotify.com/v1${path}`, {
     method,
     headers: { Authorization: `Bearer ${t.access_token}`, 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
+  if (r.status === 204) return {};
   if (!r.ok) throw new Error('Spotify error: ' + r.status);
   return r.json();
 }
+async function storeSpotify(userId,tok){const crypto=require('crypto'),key=Buffer.from(process.env.OAUTH_ENCRYPTION_KEY||'','hex');if(key.length!==32)throw new Error('OAUTH_ENCRYPTION_KEY must be 64 hex characters');const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',key,iv),encrypted=Buffer.concat([cipher.update(JSON.stringify(tok)),cipher.final(),cipher.getAuthTag()]);const {error}=await supabase.from('oauth_tokens').upsert({user_id:userId,provider:'spotify',encrypted_tokens:`${iv.toString('hex')}:${encrypted.toString('hex')}`},{onConflict:'user_id,provider'});if(error)throw error;}
+
+router.post('/command-add', requireAuth, async (req,res) => {
+  const {song,playlist}=req.body||{};
+  if(typeof song!=='string'||!song.trim()||typeof playlist!=='string'||!playlist.trim())return res.status(400).json({error:'Song and playlist are required.'});
+  try { const me=await spotify(req.user.id,'/me'); const found=await spotify(req.user.id,`/search?q=${encodeURIComponent(song)}&type=track&limit=1`);const track=found.tracks?.items?.[0];if(!track)return res.status(404).json({error:'Spotify could not find that song.'});
+    const lists=await spotify(req.user.id,'/me/playlists?limit=50');let target=(lists.items||[]).find(p=>p.name.toLocaleLowerCase()===playlist.trim().toLocaleLowerCase());
+    if(!target)target=await spotify(req.user.id,`/users/${me.id}/playlists`,'POST',{name:playlist.trim(),description:'Created by Persona',public:false});
+    await spotify(req.user.id,`/playlists/${target.id}/tracks`,'POST',{uris:[track.uri]});res.json({song:track.name,playlist:target.name,created:!(lists.items||[]).some(p=>p.id===target.id),url:target.external_urls?.spotify||null});
+  }catch(error){res.status(502).json({error:error.message});}
+});
 
 // POST /api/playlists {name, songs: ["Song — Artist", ...]}
 router.post('/', requireAuth, async (req, res) => {

@@ -8,7 +8,6 @@ function initCalendar() {
   document.getElementById('calPrev').onclick = () => Cal.moveMonth(-1);
   document.getElementById('calNext').onclick = () => Cal.moveMonth(1);
   document.getElementById('calAdd').onclick = () => Cal.add();
-  document.getElementById('calToday').onclick = () => { Cal.sel = localISODate(new Date()); Cal.y = new Date().getFullYear(); Cal.m = new Date().getMonth(); Cal.draw(); };
   document.querySelectorAll('[data-cal-view]').forEach((button) => button.onclick = () => { Cal.view = button.dataset.calView; document.querySelectorAll('[data-cal-view]').forEach((tab) => tab.classList.toggle('on', tab === button)); Cal.draw(); });
   Cal.draw();
 }

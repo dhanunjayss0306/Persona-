@@ -10,34 +10,25 @@
 // it understood, so the app can show "I created these 3 — correct?" for him
 // to confirm. Not a full AI — deterministic and debuggable.
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const { DEFAULT_TIMEZONE, dateInZone, localDateTimeUtc } = require('./timezone');
 
 // All dates are interpreted in the USER's timezone (his is Asia/Calcutta).
 // JS Date works in the server's zone, so we do day arithmetic on zoned parts.
-const USER_TZ = 'Asia/Calcutta';
-const USER_OFFSET = '+05:30'; // IST — appended when stamping times
-
-function zonedToday() {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', { timeZone: USER_TZ, year: 'numeric', month: '2-digit', day: '2-digit' })
-      .formatToParts(new Date()).map((p) => [p.type, p.value])
-  );
-  return new Date(Number(parts.year), Number(parts.month) - 1, Number(parts.day)); // local-midnight carrier
-}
-function zonedWeekday() {
-  return new Intl.DateTimeFormat('en-US', { timeZone: USER_TZ, weekday: 'long' })
+function zonedToday(timezone) { const [year,month,day]=dateInZone(new Date(),timezone).split('-').map(Number); return new Date(Date.UTC(year,month-1,day,12)); }
+function zonedWeekday(timezone) {
+  return new Intl.DateTimeFormat('en-US', { timeZone: timezone, weekday: 'long' })
     .format(new Date()).toLowerCase();
 }
-const isoDay = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const isoDay = (d) => d.toISOString().slice(0,10);
 
-function detectDate(text) {
-  const today = zonedToday();
+function detectDate(text, timezone=DEFAULT_TIMEZONE) {
+  const today = zonedToday(timezone);
   if (/day after tomorrow/.test(text)) { const d = new Date(today); d.setDate(d.getDate() + 2); return isoDay(d); }
   if (/tomorrow/.test(text)) { const d = new Date(today); d.setDate(d.getDate() + 1); return isoDay(d); }
   if (/today|tonight/.test(text)) return isoDay(today);
   const wd = WEEKDAYS.findIndex((w) => new RegExp(`\\b${w}\\b`).test(text));
   if (wd >= 0) {
-    const cur = WEEKDAYS.indexOf(zonedWeekday());
+    const cur = WEEKDAYS.indexOf(zonedWeekday(timezone));
     let diff = (wd - cur + 7) % 7;
     if (/next week/.test(text)) diff += 7;
     if (diff === 0) diff = 7;
@@ -96,9 +87,9 @@ function splitClauses(text) {
 }
 
 // Main entry: text → {date, items:[{title, kind, start, end}]}.
-function parseToItems(text) {
+function parseToItems(text, timezone=DEFAULT_TIMEZONE) {
   const lower = text.toLowerCase();
-  const date = detectDate(lower); // already an ISO day string
+  const date = detectDate(lower,timezone); // already an ISO day string
   const items = splitClauses(lower).map((clause) => {
     const { start, end } = parseTime(clause);
     const kind = classify(clause);
@@ -112,12 +103,9 @@ function parseToItems(text) {
   return { date, items };
 }
 
-function stamp(dateISO, minutes, fallbackHour = 18) {
-  // Interpret the time in the USER's timezone, store as UTC instant.
+function stamp(dateISO, minutes, fallbackHour = 18, timezone=DEFAULT_TIMEZONE) {
   const mins = minutes == null ? fallbackHour * 60 : minutes;
-  const hh = String(Math.floor(mins / 60)).padStart(2, '0');
-  const mm = String(mins % 60).padStart(2, '0');
-  return new Date(`${dateISO}T${hh}:${mm}:00${USER_OFFSET}`).toISOString();
+  return localDateTimeUtc(dateISO,Math.floor(mins/60),mins%60,timezone);
 }
 
 module.exports = { parseToItems, stamp };

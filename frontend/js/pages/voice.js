@@ -3,6 +3,7 @@ async function initVoice() {
   const $ = (id) => document.getElementById(id);
   try { const profile = await API.get('/api/voice/profile'); $('wakeWord').value = profile.wake_word || 'Hey Persona'; } catch { /* Profile is optional until saved. */ }
   $('micBig').onclick = () => Voice.listen();
+  $('personaCommandGo').onclick = () => Voice.command($('personaCommand').value.trim());
   $('voiceFallbackGo').onclick = () => {
     const text = $('voiceFallbackText').value.trim();
     if (!text) return UI.toast('Type a task or something you want to remember');
@@ -66,6 +67,18 @@ async function initVoice() {
 const Voice = {
   rec: null, micStream: null, listening: false, requesting: false, watching: false, watchRestart: null,
   sr() { const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition; return Recognition ? new Recognition() : null; },
+  async command(text) {
+    const out=document.getElementById('personaCommandResult');
+    const m=text.match(/^add\s+(.+?)\s+to\s+(.+)$/i), call=text.match(/^call\s+(.+)$/i), place=text.match(/^take me to\s+(.+)$/i), meet=/^create (?:a )?meet link$/i.test(text);
+    const action=m?`Add “${m[1]}” to Spotify playlist “${m[2]}”`:call?`Call ${call[1]}`:place?`Open directions to ${place[1]}`:meet?'Create a Google Meet link':null;
+    if(!action){out.textContent='Try “add <song> to <playlist>”, “create a Meet link”, “call <name>”, or “take me to <place>”.';return;}
+    UI.confirmSheet('Confirm this command?',action,async()=>{try{
+      if(m){const r=await API.post('/api/playlists/command-add',{song:m[1],playlist:m[2]});out.textContent=`Added ${r.song} to ${r.playlist}.`;}
+      if(call){const r=await API.get('/api/voice/call?name='+encodeURIComponent(call[1]));location.href=r.tel_link;}
+      if(place)location.href=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place[1])}`;
+      if(meet){const r=await API.post('/api/voice/meet',{});out.innerHTML=`Meet link: <a href="${UI.esc(r.meet_link)}" target="_blank" rel="noopener">Open meeting</a>`;}
+    }catch(error){if(m&&/connect spotify/i.test(error.message)){try{const r=await API.post('/api/playlists/spotify/login-url',{});location.href=r.url;return;}catch(e){UI.toast(e.message);return;}}if(meet&&/connect google/i.test(error.message)){try{const r=await API.post('/api/voice/google/login-url',{});location.href=r.url;return;}catch(e){UI.toast(e.message);return;}}UI.toast(error.message);}},'Continue');
+  },
   stopMicStream() { this.micStream?.getTracks().forEach((track) => track.stop()); this.micStream = null; },
   async requestMic() {
     if (!window.isSecureContext) throw new Error('Microphone access needs HTTPS or localhost. Open this app on a secure address.');
@@ -126,6 +139,7 @@ const Voice = {
     catch { this.resetMic(); UI.toast('Could not start speech recognition. Try again.'); }
   },
   async processText(text) {
+    if (/^add\s+.+\s+to\s+.+$/i.test(text) || /^create (?:a )?meet link$/i.test(text) || /^call\s+.+$/i.test(text) || /^take me to\s+.+$/i.test(text)) return this.command(text);
     document.getElementById('micText').textContent = `“${text}”`;
     document.getElementById('micHint').textContent = 'Preparing a review…';
     try {

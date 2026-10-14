@@ -5,12 +5,14 @@
 //       cp .env.example .env   (then fill it)
 //       npm start               (http://localhost:3001)
 require('dotenv').config();
+if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is required');
 const express = require('express');
 const cors = require('cors');
 const supabase = require('./db');
 
 const app = express();
 const frontendOrigins = (process.env.FRONTEND_URL || '').split(',').map((origin) => origin.trim()).filter(Boolean);
+if (process.env.NODE_ENV === 'production' && (!frontendOrigins.length || frontendOrigins.includes('*'))) throw new Error('FRONTEND_URL must list explicit CORS origins in production');
 app.use(cors({ origin: frontendOrigins.length ? frontendOrigins : '*' }));
 app.use(express.json({ limit: '2mb' }));
 

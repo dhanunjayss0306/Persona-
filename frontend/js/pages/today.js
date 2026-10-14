@@ -1,5 +1,7 @@
 /* today.js — greeting + today's agenda from the merged calendar feed. */
 async function initToday() {
+  unlockAlarmAudio();
+  let timezone='Asia/Kolkata'; try { timezone=(await API.get('/api/auth/me')).user?.timezone||timezone; } catch(error) { console.error('Could not load profile timezone:',error.message); }
   const u = Auth.user();
   const h = new Date().getHours();
   document.getElementById('todayHello').textContent =
@@ -10,11 +12,9 @@ async function initToday() {
   document.getElementById('todayVoice').onclick = () => go('voice');
   const upcomingExamPrompt = renderUpcomingExamPrompt(box);
   const activeSticky = renderActiveSticky(box);
-  const weeklyReview = renderWeeklyReview(box);
+  const weeklyReview = renderWeeklyReview(box, timezone);
   try {
-    const today = new Date();
-    const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const { days } = await API.get(`/api/calendar?from=${t}&to=${t}`);
+    const { days, from:t } = await API.get('/api/calendar');
     const d = days[t];
     if (!d || (!d.reminders.length && !d.plan_blocks.length && !d.events.length)) {
       box.innerHTML = '<div class="card center"><p style="font-size:40px">🌤️</p><p><b>Nothing scheduled today.</b></p><p class="muted sm">Enjoy the free day — or plan one.</p></div>';
@@ -56,8 +56,14 @@ async function renderUpcomingExamPrompt(box) {
     const examLabel = examDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     box.insertAdjacentHTML('afterbegin', `<section class="card examPrompt"><span class="eyebrow">STUDY CHECK-IN</span><h3>${UI.esc(exam.title)} is ${when}</h3><p class="muted sm">Your exam is on ${examLabel}. Set aside study time today; Persona can turn your topics into a daily plan and reminders.</p><button class="btn primary" id="todayExamPlan" type="button">Open study planner</button>${upcoming.length > 1 ? `<p class="muted sm examMore">${upcoming.length - 1} more exam${upcoming.length === 2 ? '' : 's'} in the next 30 days</p>` : ''}</section>`);
     document.getElementById('todayExamPlan').onclick = () => go('planner');
-  } catch { /* An exam prompt is optional when planner data is unavailable. */ }
+  } catch (error) { box.insertAdjacentHTML('afterbegin', `<p class="muted sm" role="alert">Could not load exam dates: ${UI.esc(error.message)}</p>`); }
 }
+
+let stickyAlarmContext=null, stickyAlarmTimer=null, stickyAlarmStopped=false;
+function unlockAlarmAudio(){ document.addEventListener('pointerdown',()=>{ if(!stickyAlarmContext){const C=window.AudioContext||window.webkitAudioContext;if(C)stickyAlarmContext=new C();} stickyAlarmContext?.resume?.(); },{once:true}); }
+function playStickyAlarm(){ if(stickyAlarmStopped||!stickyAlarmContext)return; const osc=stickyAlarmContext.createOscillator(),gain=stickyAlarmContext.createGain();osc.frequency.value=880;gain.gain.value=.12;osc.connect(gain);gain.connect(stickyAlarmContext.destination);osc.start();osc.stop(stickyAlarmContext.currentTime+.35);stickyAlarmTimer=setTimeout(playStickyAlarm,900); }
+async function checkStickyAlarm(){ try {const reminders=await API.get('/api/reminders');const due=reminders.some(r=>r.type==='nag'&&r.status!=='done'&&new Date(r.due_at)<=new Date());if(due&&!stickyAlarmStopped){if(!document.getElementById('stickyAlarmStop')){const b=document.createElement('button');b.id='stickyAlarmStop';b.className='btn danger';b.textContent='Stop alarm';b.style.cssText='position:fixed;z-index:1000;right:18px;bottom:90px';b.onclick=()=>{stickyAlarmStopped=true;clearTimeout(stickyAlarmTimer);b.remove();};document.body.append(b);}playStickyAlarm();}}catch(error){console.error('Sticky alarm status unavailable:',error.message);} }
+setInterval(checkStickyAlarm,30000);
 
 async function renderActiveSticky(box) {
   try {
@@ -67,18 +73,18 @@ async function renderActiveSticky(box) {
     box.insertAdjacentHTML('afterbegin', `<section class="card activeSticky"><span class="eyebrow">STICKY MINDER</span><h3>Still on your list</h3>${active.slice(0,8).map((item) => `<div class="stickyItem" data-sticky-id="${UI.esc(item.id)}"><div><b>${UI.esc(item.title)}</b><small>${UI.dt(item.due_at)}</small></div><button class="btn sm" data-sticky-snooze="${UI.esc(item.id)}">Snooze 10m</button><button class="btn primary sm" data-sticky-done="${UI.esc(item.id)}">Done</button></div>`).join('')}</section>`);
     box.querySelectorAll('[data-sticky-done]').forEach((button) => button.onclick = async () => { try { await API.patch(`/api/reminders/${button.dataset.stickyDone}`, { status: 'done' }); await initToday(); UI.toast('Marked done'); } catch(error) { UI.toast(error.message); } });
     box.querySelectorAll('[data-sticky-snooze]').forEach((button) => button.onclick = async () => { try { const due = new Date(Date.now()+10*60000).toISOString(); await API.patch(`/api/reminders/${button.dataset.stickySnooze}`, { due_at: due }); await initToday(); UI.toast('Snoozed for 10 minutes'); } catch(error) { UI.toast(error.message); } });
-  } catch { /* This section stays hidden if reminders are unavailable. */ }
+  } catch (error) { box.insertAdjacentHTML('afterbegin', `<p class="muted sm" role="alert">Could not load sticky reminders: ${UI.esc(error.message)}</p>`); }
 }
 
-async function renderWeeklyReview(box) {
+async function renderWeeklyReview(box, timezone='Asia/Kolkata') {
   try {
-    const rows=await API.get('/api/reminders'), today=new Date(), start=new Date(today); start.setHours(0,0,0,0); start.setDate(start.getDate()-6);
-    const week=Array.from({length:7},(_,index)=>{const date=new Date(start);date.setDate(date.getDate()+index);const key=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;const items=rows.filter((row)=>row.due_at.slice(0,10)===key);return {key,label:date.toLocaleDateString('en-IN',{weekday:'short'}),done:items.filter((row)=>row.status==='done').length,total:items.length};});
+    const rows=await API.get('/api/reminders'), now=new Date(), todayKey=new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now), today=new Date(`${todayKey}T12:00:00Z`), start=new Date(today); start.setUTCDate(start.getUTCDate()-6);
+    const week=Array.from({length:7},(_,index)=>{const date=new Date(start);date.setUTCDate(date.getUTCDate()+index);const key=date.toISOString().slice(0,10);const items=rows.filter((row)=>new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(row.due_at))===key);return {key,label:date.toLocaleDateString('en-IN',{weekday:'short'}),done:items.filter((row)=>row.status==='done').length,total:items.length};});
     const complete=week.reduce((sum,day)=>sum+day.done,0), total=week.reduce((sum,day)=>sum+day.total,0), percent=total?Math.round(complete/total*100):0;
-    let streak=0; for(let i=week.length-1;i>=0;i--){if(week[i].done)streak++;else if(week[i].key!==localISODate(new Date()))break;}
+    let streak=0; for(let i=week.length-1;i>=0;i--){if(week[i].done)streak++;else if(week[i].key!==todayKey)break;}
     const chart=`<div class="weekChart" role="img" aria-label="Reminders completed over the last seven days">${week.map((day)=>`<div><i style="height:${Math.max(8,day.total?day.done/day.total*100:8)}%" title="${day.done} of ${day.total} done"></i><small>${day.label}</small></div>`).join('')}</div>`;
     box.insertAdjacentHTML('beforeend', `<details class="card weeklyReview"><summary><span class="eyebrow">YOUR WEEK</span><b>Progress and streak</b><span class="weeklyScore">${percent}%</span></summary><p class="muted sm">${complete} of ${total} reminders done · ${streak}-day completion streak</p>${chart}</details>`);
-  } catch { /* Weekly review is optional when reminder history cannot load. */ }
+  } catch (error) { box.insertAdjacentHTML('beforeend', `<section class="card" role="alert"><b>Could not load weekly review</b><p class="muted sm">${UI.esc(error.message)}</p></section>`); }
 }
 
 document.addEventListener('DOMContentLoaded', () => { if (document.getElementById('page-today')) initToday(); });
