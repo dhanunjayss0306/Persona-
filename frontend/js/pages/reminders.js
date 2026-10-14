@@ -62,7 +62,7 @@ const Reminders = {
     const proofs = await API.get(`/api/reminders/${id}/proofs`).catch(() => []);
     UI.sheet(`<h3 style="font-family:var(--font-d);font-size:22px;margin-bottom:6px">${UI.esc(r.title)}</h3>
       <p class="muted sm" style="margin-bottom:12px">${r.type === 'nag' ? 'Sticky — repeats every 5 min until Done; proof is optional' : 'One-time'} · ${UI.dt(r.due_at)} · ${r.status}</p>
-      ${r.details ? `<p style="margin-bottom:12px">${UI.esc(r.details)}</p>` : ''}
+      ${r.details ? `<p style="margin-bottom:12px">${UI.googleLinks(r.details)}</p>` : ''}
       ${proofs.length ? `<p class="kicker">Proof submitted</p>` + proofs.map((p) => `<p class="sm">✓ ${p.kind}${p.text ? ' — ' + UI.esc(p.text) : ''}${p.file_url ? ` — <a href="${p.file_url}" target="_blank">view</a>` : ''}</p>`).join('') : ''}
       ${r.status !== 'done' ? `
       <div class="row"><button class="btn primary" id="remDone">Done</button><button class="btn" id="remSnooze">Snooze 10m</button></div>

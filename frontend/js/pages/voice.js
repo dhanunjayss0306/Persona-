@@ -47,9 +47,9 @@ async function initVoice() {
   };
   $('meetGo').onclick = async () => {
     const title = $('meetTitle').value.trim() || 'Persona meeting';
-    UI.confirmSheet('Create a Google Meet?', `Persona will create a calendar event called “${title}”.`, async () => {
+    UI.confirmSheet('Create a Google Meet?', `Persona will create “${title}” in Google Calendar and your Persona calendar, with a reminder.`, async () => {
       try {
-        const result = await API.post('/api/voice/meet', { title });
+        const result = await API.post('/api/voice/meet', { title, reminder_minutes: 0 });
         $('meetOut').innerHTML = `<p class="meetResult">Meet link ready · <a href="${UI.esc(result.meet_link)}" target="_blank" rel="noopener">Open meeting</a> <button class="btn sm" id="copyMeetLink">Copy link</button></p>`;
         document.getElementById('copyMeetLink').onclick = async () => { try { await navigator.clipboard.writeText(result.meet_link); UI.toast('Meet link copied'); } catch { UI.toast(result.meet_link); } };
       } catch (error) { UI.toast(error.message); if (/connect google/i.test(error.message)) $('googleConnect').classList.remove('hidden'); }
@@ -73,14 +73,7 @@ const Voice = {
   },
   isMeetRequest(text) {
     const heard = this.hear(text);
-    return /^create\s+(?:a\s+)?(?:google\s+)?(?:meet|meeting)\s+link\b/i.test(heard)
-      || (/link\b/i.test(heard) && /meet|meeting|google\s+meet/i.test(heard));
-  },
-  meetTitle(text) {
-    const heard = this.hear(text);
-    const withMatch = heard.match(/with\s+([a-zA-Z][a-zA-Z\s]*?)(?=\s+at\s+|\s+on\s+|\s+for\s+|$)/);
-    if (withMatch) return `Meeting with ${withMatch[1].trim()}`;
-    return 'Persona meeting';
+    return /^(?:please\s+)?(?:create|make|schedule|set\s+up|generate)\s+(?:a\s+)?(?:google\s+)?(?:meet|meeting)(?:\s+link)?\b/i.test(heard);
   },
   async command(text) {
     const heard = this.hear(text);
@@ -88,12 +81,18 @@ const Voice = {
     let command; try { command=(await API.post('/api/voice/command/parse',{text: heard})).command; } catch(error) { UI.toast(error.message); return; }
     if(!command && this.isMeetRequest(text)) command = { intent:'meet', details: heard.replace(/^create\s+(?:a\s+)?(?:google\s+)?(?:meet|meeting)\s+link\b/i,'').trim() };
     if(!command){out.textContent='Try “add <song> to <playlist>”, “add this song to my <playlist>”, “create a Google Meet link”, “call <name>”, or “take me to <place>”.';return;}
-    const action=command.intent==='spotify_add'?`Add ${command.currentlyPlaying?'the currently playing song':`“${command.song}”`} to Spotify playlist “${command.playlist}”`:command.intent==='call'?`Call ${command.name}`:command.intent==='directions'?`Open directions to ${command.place}`:'Create a Google Meet link';
-    UI.confirmSheet('Confirm this command?',action,async()=>{try{
+    const action=command.intent==='spotify_add'?`Add ${command.currentlyPlaying?'the currently playing song':`“${command.song}”`} to Spotify playlist “${command.playlist}”`:command.intent==='call'?`Call ${command.name}`:command.intent==='directions'?`Open directions to ${command.place}`:`Create ${command.title||'a Google Meet'} and save it to Google Calendar and Persona calendar${command.event_date?` on ${command.event_date} at ${command.start_time}`:' soon'}; remind me ${command.reminder_minutes?`${command.reminder_minutes} minutes before`:'when it starts'}.`;
+    UI.confirmSheet('Confirm this command?',UI.esc(action),async()=>{try{
       if(command.intent==='spotify_add'){const r=await API.post('/api/playlists/command-add',{song:command.song,playlist:command.playlist,currently_playing:command.currentlyPlaying});out.textContent=`Added ${r.song} to ${r.playlist}.`;}
       if(command.intent==='call'){const r=await API.get('/api/voice/call?name='+encodeURIComponent(command.name));location.href=r.tel_link;}
       if(command.intent==='directions')location.href=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(command.place)}`;
-      if(command.intent==='meet'){const title = command.details ? Voice.meetTitle(command.details) : Voice.meetTitle(text); const r=await API.post('/api/voice/meet',{ title });out.innerHTML=`Meet link: <a href="${UI.esc(r.meet_link)}" target="_blank" rel="noopener">Open meeting</a>`;}
+      if(command.intent==='meet'){
+        const body={title:command.title||'Persona meeting',minutes:command.minutes,reminder_minutes:command.reminder_minutes};
+        if(command.event_date)body.event_date=command.event_date;
+        if(command.start_time)body.start_time=command.start_time;
+        const r=await API.post('/api/voice/meet',body);
+        out.innerHTML=`Meet link: <a href="${UI.esc(r.meet_link)}" target="_blank" rel="noopener">Open meeting</a>${r.event?` · <a href="${UI.esc(r.event)}" target="_blank" rel="noopener">Google Calendar event</a>`:''}<p class="muted sm">Saved to your Persona calendar with a reminder.</p>`;
+      }
     }catch(error){if(command.intent==='spotify_add'&&/connect spotify/i.test(error.message)){try{const r=await API.post('/api/playlists/spotify/login-url',{});location.href=r.url;return;}catch(e){UI.toast(e.message);return;}}if(command.intent==='meet'&&/connect google/i.test(error.message)){try{const r=await API.post('/api/voice/google/login-url',{});location.href=r.url;return;}catch(e){UI.toast(e.message);return;}}UI.toast(error.message);}},'Continue');
   },
   stopMicStream() { this.micStream?.getTracks().forEach((track) => track.stop()); this.micStream = null; },

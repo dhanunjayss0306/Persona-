@@ -32,6 +32,7 @@ async function selectNags(status) {
 }
 
 async function nagTick() {
+  const now = new Date().toISOString();
   // Work nags: due + not done + (never nagged OR 5 min since last nag).
   const nags = await selectNags('ringing');
   // Freshly due nags move pending -> ringing.

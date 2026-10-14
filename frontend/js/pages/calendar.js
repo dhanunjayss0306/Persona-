@@ -88,7 +88,7 @@ Cal.day = function () {
     let html = heading;
     data.events.forEach((event) => {
       const time = event.start_time ? ` · ${UI.esc(String(event.start_time).slice(0, 5))}` : '';
-      const detail = event.details ? ` · ${UI.esc(event.details)}` : '';
+      const detail = event.details ? ` · ${UI.googleLinks(event.details)}` : '';
       const actions = event.source === 'calendar' ? `<button class="btn sm" type="button" data-calendar-edit="${UI.esc(event.id)}" aria-label="Edit ${UI.esc(event.title)}">Edit</button><button class="btn sm danger" type="button" data-calendar-delete="${UI.esc(event.id)}" aria-label="Delete ${UI.esc(event.title)}">Delete</button>` : '';
       html += `<div class="rem calendarEventRow"${event.source === 'calendar' ? ` draggable="true" data-calendar-drag="${UI.esc(event.id)}"` : ''}><div class="dot" style="background:${event.kind === 'exam' ? 'var(--danger)' : event.source === 'calendar' ? 'var(--gold)' : 'var(--leaf, var(--ok))'}"></div><div class="t"><b>${UI.esc(event.title)}</b><span>${UI.esc(event.kind || 'Event')}${time}${detail}</span></div><span class="badge">${event.source === 'calendar' ? 'Calendar' : 'Event'}</span>${actions}</div>`;
     });

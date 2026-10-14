@@ -38,4 +38,8 @@ const UI = {
   d(iso) { return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); },
   inr(n) { return '₹' + Number(n || 0).toLocaleString('en-IN'); },
   esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); },
+  googleLinks(s) {
+    return UI.esc(s).replace(/https:\/\/meet\.google\.com\/[a-z0-9-]+/gi, (url) =>
+      `<a href="${url}" target="_blank" rel="noopener">Open Google Meet</a>`).replace(/\n/g, '<br>');
+  },
 };

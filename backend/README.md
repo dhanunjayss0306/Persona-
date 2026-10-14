@@ -62,9 +62,15 @@ created â†’ you get notified through the normal channel.
 
 **Meet link:** open Voice and choose **Connect Google Calendar**. The app uses
 `POST /api/voice/google/login-url` for the signed OAuth flow; then
-`POST /api/voice/meet` returns a `meet_link`. Google OAuth settings must be
-configured in the backend environment. Tokens currently live in memory and
-will need persistent encrypted storage for multi-instance or restart-safe use.
+`POST /api/voice/meet` returns a `meet_link`. You can also say, “Create a Google
+Meet link with Alex tomorrow at 5 pm and remind me 10 minutes before.” After
+confirmation, Persona creates a Google Calendar event with a Meet link, a
+matching Persona calendar entry, and a one-time reminder. If no date or time is
+given, the meeting is scheduled five minutes from now and the reminder fires at
+the start. Google OAuth settings must be configured in the backend environment,
+and the OAuth client’s authorized redirect URI must exactly match
+`GOOGLE_REDIRECT_URI`. Tokens are stored encrypted in Supabase using
+`OAUTH_ENCRYPTION_KEY`.
 
 **Spotify playlist:** connect once (`GET /api/playlists/spotify/login`), then
 `POST /api/playlists` with `{name, songs[]}` creates it on your account.

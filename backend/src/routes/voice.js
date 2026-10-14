@@ -13,7 +13,7 @@ const jwt = require('jsonwebtoken');
 const supabase = require('../db');
 const { requireAuth } = require('../auth');
 const { parseToItems, stamp } = require('../services/nlp');
-const { DEFAULT_TIMEZONE } = require('../services/timezone');
+const { DEFAULT_TIMEZONE, dateInZone, localDateTimeUtc } = require('../services/timezone');
 const { parseVoiceCommand } = require('../services/behavior');
 
 const router = express.Router();
@@ -63,9 +63,28 @@ router.post('/parse', requireAuth, async (req, res) => {
   });
 });
 
-router.post('/command/parse', requireAuth, (req,res) => {
+router.post('/command/parse', requireAuth, async (req,res) => {
   const text=String(req.body?.text||'').slice(0,300);
-  res.json({ command:parseVoiceCommand(text) });
+  const command=parseVoiceCommand(text);
+  if (command?.intent === 'meet') {
+    const {data:profile,error}=await supabase.from('users').select('timezone').eq('id',req.user.id).maybeSingle();
+    if(error)return res.status(502).json({error:'Could not load your timezone to schedule the meeting.'});
+    const timezone=profile?.timezone||DEFAULT_TIMEZONE;
+    const parsed=parseToItems(text,timezone);
+    const scheduled=parsed.items.find((item)=>item.start!==null);
+    const mentionsDate=/\b(?:today|tonight|tomorrow|day after tomorrow|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2}(?:st|nd|rd|th))\b/i.test(text);
+    if (scheduled || mentionsDate) {
+      command.event_date=parsed.date;
+      command.start_time=scheduled ? `${String(Math.floor(scheduled.start/60)).padStart(2,'0')}:${String(scheduled.start%60).padStart(2,'0')}` : '09:00';
+    }
+    const duration=text.match(/\b(?:for|lasting)\s+(\d{1,3})\s*(minutes?|mins?|hours?|hrs?)\b/i);
+    command.minutes=duration ? Math.min(480, Number(duration[1]) * (/^(?:hours?|hrs?)$/i.test(duration[2]) ? 60 : 1)) : 30;
+    const reminder=text.match(/\bremind\s+me\s+(?:at\s+least\s+)?(\d{1,3})\s*(minutes?|mins?|hours?|hrs?)\s+before\b/i);
+    command.reminder_minutes=reminder
+      ? Math.min(40320, Number(reminder[1]) * (/^(?:hours?|hrs?)$/i.test(reminder[2]) ? 60 : 1))
+      : (scheduled || mentionsDate ? 10 : 0);
+  }
+  res.json({ command });
 });
 
 // ---------- voice enrollment ----------
@@ -146,12 +165,16 @@ async function loadGoogle(userId) { const {data,error}=await supabase.from('oaut
 router.get('/google/status', requireAuth, async (req, res) => { try { res.json({ connected:!!(await loadGoogle(req.user.id)) }); } catch(e) { res.status(503).json({error:e.message}); } });
 
 router.post('/google/login-url', requireAuth, (req, res) => {
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+  const clientId=String(process.env.GOOGLE_CLIENT_ID||'').trim();
+  if (!clientId || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
     return res.status(503).json({ error: 'Google Calendar is not configured on the backend.' });
+  }
+  if (/\s/.test(clientId) || !/^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/.test(clientId)) {
+    return res.status(503).json({ error: 'Google OAuth client ID is malformed. Copy the Web application client ID from Google Cloud Console into backend/.env.' });
   }
   const state = jwt.sign({ sub: req.user.id, purpose: 'google-calendar' }, jwtSecret, { expiresIn: '10m' });
   const params = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID,
+    client_id: clientId,
     redirect_uri: process.env.GOOGLE_REDIRECT_URI,
     response_type: 'code',
     scope: 'https://www.googleapis.com/auth/calendar.events',
@@ -174,18 +197,21 @@ router.get('/google/callback', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        code: req.query.code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        code: req.query.code, client_id: String(process.env.GOOGLE_CLIENT_ID||'').trim(), client_secret: String(process.env.GOOGLE_CLIENT_SECRET||'').trim(),
         redirect_uri: process.env.GOOGLE_REDIRECT_URI, grant_type: 'authorization_code',
       }),
     });
     const tokens = await response.json();
-    if (!response.ok || !tokens.access_token) return res.status(400).send('Google login failed. Return to Persona and try again.');
+    if (!response.ok || !tokens.access_token) {
+      console.error('[google] OAuth token exchange rejected:', tokens.error || `HTTP ${response.status}`);
+      return res.status(400).send('Google rejected the OAuth client credentials. Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in backend/.env.');
+    }
     await saveGoogle(identity.sub, { ...tokens, expires_at: Date.now() + Number(tokens.expires_in || 3600) * 1000 });
     res.send('<!doctype html><meta name="viewport" content="width=device-width"><title>Connected · Persona</title><main style="font:16px system-ui;max-width:420px;margin:15vh auto;padding:24px;color:#172033"><h1>Google Calendar connected</h1><p>You can close this tab and return to Persona.</p></main>');
   } catch { res.status(502).send('Could not reach Google. Return to Persona and try again.'); }
 });
 
-// POST /api/voice/meet {title?, minutes?} → creates event + Meet link.
+// POST /api/voice/meet → creates a Google event, Persona calendar entry, and reminder.
 router.post('/meet', requireAuth, async (req, res) => {
   let tok; try { tok=await loadGoogle(req.user.id); } catch(e) { return res.status(503).json({error:e.message}); }
   if (!tok) return res.status(400).json({ error: 'Connect Google Calendar first.' });
@@ -194,7 +220,7 @@ router.post('/meet', requireAuth, async (req, res) => {
     try {
       const refresh = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, refresh_token: tok.refresh_token, grant_type: 'refresh_token' }),
+        body: new URLSearchParams({ client_id: String(process.env.GOOGLE_CLIENT_ID||'').trim(), client_secret: String(process.env.GOOGLE_CLIENT_SECRET||'').trim(), refresh_token: tok.refresh_token, grant_type: 'refresh_token' }),
       });
       const next = await refresh.json();
       if (!refresh.ok || !next.access_token) return res.status(401).json({ error: 'Google session expired. Connect Google Calendar again.' });
@@ -202,27 +228,73 @@ router.post('/meet', requireAuth, async (req, res) => {
       await saveGoogle(req.user.id, tok);
     } catch { return res.status(502).json({ error: 'Could not refresh Google connection. Try again.' }); }
   }
-  const { title, minutes } = req.body || {};
+  const { title, minutes, event_date, start_time } = req.body || {};
   const duration = minutes === undefined ? 30 : Number(minutes);
   if (!Number.isFinite(duration) || duration < 1 || duration > 480) return res.status(400).json({ error: 'Meeting length must be between 1 and 480 minutes.' });
   if (title !== undefined && (typeof title !== 'string' || title.length > 200)) return res.status(400).json({ error: 'Meeting title must be under 200 characters.' });
-  const start = new Date(Date.now() + 5 * 60000);
+  if (event_date !== undefined && (typeof event_date!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(event_date) || Number.isNaN(Date.parse(`${event_date}T00:00:00Z`)) || new Date(`${event_date}T00:00:00Z`).toISOString().slice(0,10) !== event_date)) {
+    return res.status(400).json({ error: 'Choose a valid meeting date.' });
+  }
+  if (start_time !== undefined && (typeof start_time!=='string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(start_time))) {
+    return res.status(400).json({ error: 'Choose a valid meeting time.' });
+  }
+  const reminderMinutes = req.body?.reminder_minutes === undefined ? 0 : Number(req.body.reminder_minutes);
+  if (!Number.isInteger(reminderMinutes) || reminderMinutes < 0 || reminderMinutes > 40320) {
+    return res.status(400).json({ error: 'Reminder must be between 0 and 40,320 minutes before the meeting.' });
+  }
+  const {data:profile,error:profileError}=await supabase.from('users').select('timezone').eq('id',req.user.id).maybeSingle();
+  if(profileError)return res.status(502).json({error:'Could not load your timezone to schedule the meeting.'});
+  const timezone=profile?.timezone||DEFAULT_TIMEZONE;
+  const hasSchedule=event_date!==undefined||start_time!==undefined;
+  const start=hasSchedule
+    ? new Date(localDateTimeUtc(event_date||dateInZone(new Date(),timezone),Number((start_time||'09:00').slice(0,2)),Number((start_time||'09:00').slice(3,5)),timezone))
+    : new Date(Date.now()+5*60000);
+  if(start.getTime()<=Date.now())return res.status(400).json({error:'That meeting time has already passed. Choose a future date and time.'});
   const end = new Date(start.getTime() + duration * 60000);
+  const eventDate=dateInZone(start,timezone);
+  const timeParts=new Intl.DateTimeFormat('en-GB',{timeZone:timezone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(start);
+  const eventTime=`${timeParts.find((part)=>part.type==='hour')?.value||'09'}:${timeParts.find((part)=>part.type==='minute')?.value||'00'}`;
+  const eventTitle=String(title||'Persona meeting').trim()||'Persona meeting';
   let r, ev;
   try {
     r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
       method: 'POST',
       headers: { Authorization: `Bearer ${tok.access_token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        summary: title || 'Persona meeting',
+        summary: eventTitle,
         start: { dateTime: start.toISOString() }, end: { dateTime: end.toISOString() },
+        reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: reminderMinutes }] },
         conferenceData: { createRequest: { requestId: 'persona-' + Date.now() } },
       }),
     });
     ev = await r.json();
   } catch { return res.status(502).json({ error: 'Could not reach Google Calendar. Try again.' }); }
   if (!r.ok || !ev.hangoutLink) return res.status(502).json({ error: 'Google Calendar could not create a Meet link.' });
-  res.json({ meet_link: ev.hangoutLink, event: ev.htmlLink });
+  const details=`Google Meet: ${ev.hangoutLink}${ev.htmlLink ? `\nGoogle Calendar: ${ev.htmlLink}` : ''}`;
+  const {data:calendarEvent,error:calendarError}=await supabase.from('calendar_events').insert({
+    user_id:req.user.id,title:eventTitle,details,event_date:eventDate,start_time:eventTime,
+  }).select('id').single();
+  if(calendarError)return res.status(502).json({
+    error:'Google created the meeting, but Persona could not save it to the in-app calendar. Run migration 004_calendar_events.sql in Supabase.',
+    meet_link:ev.hangoutLink,event:ev.htmlLink||null,
+  });
+  const dueAt=new Date(start.getTime()-reminderMinutes*60000).toISOString();
+  let {data:reminder,error:reminderError}=await supabase.from('reminders').insert({
+    user_id:req.user.id,title:eventTitle,details,type:'once',item_type:'meeting',proof_required:false,due_at:dueAt,
+  }).select('id').single();
+  if(reminderError&&/item_type/i.test(reminderError.message)){
+    ({data:reminder,error:reminderError}=await supabase.from('reminders').insert({
+      user_id:req.user.id,title:eventTitle,details,type:'once',proof_required:false,due_at:dueAt,
+    }).select('id').single());
+  }
+  if(reminderError)return res.status(502).json({
+    error:'Google created the meeting and Persona saved it to the calendar, but could not create the reminder.',
+    meet_link:ev.hangoutLink,event:ev.htmlLink||null,calendar_event_id:calendarEvent.id,
+  });
+  res.json({
+    meet_link:ev.hangoutLink,event:ev.htmlLink||null,calendar_event_id:calendarEvent.id,reminder_id:reminder.id,
+    starts_at:start.toISOString(),reminder_at:dueAt,
+  });
 });
 
 module.exports = router;
