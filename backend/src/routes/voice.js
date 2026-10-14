@@ -14,6 +14,7 @@ const supabase = require('../db');
 const { requireAuth } = require('../auth');
 const { parseToItems, stamp } = require('../services/nlp');
 const { DEFAULT_TIMEZONE } = require('../services/timezone');
+const { parseVoiceCommand } = require('../services/behavior');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -42,7 +43,7 @@ router.post('/parse', requireAuth, async (req, res) => {
         user_id: req.user.id,
         title: title.charAt(0).toUpperCase() + title.slice(1),
         details: isWork ? null : `Added from voice input.`,
-        type: isWork ? 'nag' : 'once',
+        type: isWork ? 'nag' : 'once', item_type: it.kind,
         due_at,
       }).select().single();
       if (error) return res.status(500).json({ error: `Could not create "${it.title}": ${error.message}`, created: created.map((c) => ({ id: c.id, title: c.title })) });
@@ -54,6 +55,11 @@ router.post('/parse', requireAuth, async (req, res) => {
     created: created.map((c) => ({ id: c.id, title: c.title, type: c.type, due_at: c.due_at })),
     message: `Arranged ${items.length} item(s) for ${date}.`,
   });
+});
+
+router.post('/command/parse', requireAuth, (req,res) => {
+  const text=String(req.body?.text||'').slice(0,300);
+  res.json({ command:parseVoiceCommand(text) });
 });
 
 // ---------- voice enrollment ----------

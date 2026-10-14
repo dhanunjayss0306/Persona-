@@ -111,7 +111,7 @@ router.patch('/me', requireAuth, async (req, res) => {
   if (patch.timezone) { try { new Intl.DateTimeFormat('en', { timeZone: patch.timezone }); } catch { return res.status(400).json({ error: 'Invalid timezone.' }); } }
   if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing to update' });
   const { data, error } = await supabase.from('users').update(patch)
-    .eq('id', req.user.id).select('id,name,email,phone,work,field_of_study,degrees,bio').single();
+    .eq('id', req.user.id).select('id,name,email,phone,work,field_of_study,degrees,bio,timezone').single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ user: data });
 });

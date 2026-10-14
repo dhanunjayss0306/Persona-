@@ -2,6 +2,7 @@ alter table users add column if not exists timezone text not null default 'Asia/
 alter table users alter column password_hash drop not null;
 alter table reminders drop constraint if exists reminders_type_check;
 alter table reminders add constraint reminders_type_check check (type in ('once','nag','plain'));
+alter table reminders add column if not exists item_type text not null default 'task';
 alter table voice_profiles add column if not exists sample_path text;
 alter table voice_profiles add column if not exists sample_url text;
 update storage.buckets set public = false where id in ('proofs','voice-samples');

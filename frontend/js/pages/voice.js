@@ -69,15 +69,15 @@ const Voice = {
   sr() { const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition; return Recognition ? new Recognition() : null; },
   async command(text) {
     const out=document.getElementById('personaCommandResult');
-    const m=text.match(/^add\s+(.+?)\s+to\s+(.+)$/i), call=text.match(/^call\s+(.+)$/i), place=text.match(/^take me to\s+(.+)$/i), meet=/^create (?:a )?meet link$/i.test(text);
-    const action=m?`Add “${m[1]}” to Spotify playlist “${m[2]}”`:call?`Call ${call[1]}`:place?`Open directions to ${place[1]}`:meet?'Create a Google Meet link':null;
-    if(!action){out.textContent='Try “add <song> to <playlist>”, “create a Meet link”, “call <name>”, or “take me to <place>”.';return;}
+    let command; try { command=(await API.post('/api/voice/command/parse',{text})).command; } catch(error) { UI.toast(error.message); return; }
+    if(!command){out.textContent='Try “add <song> to <playlist>”, “add this song to my <playlist>”, “create a Google Meet link”, “call <name>”, or “take me to <place>”.';return;}
+    const action=command.intent==='spotify_add'?`Add ${command.currentlyPlaying?'the currently playing song':`“${command.song}”`} to Spotify playlist “${command.playlist}”`:command.intent==='call'?`Call ${command.name}`:command.intent==='directions'?`Open directions to ${command.place}`:'Create a Google Meet link';
     UI.confirmSheet('Confirm this command?',action,async()=>{try{
-      if(m){const r=await API.post('/api/playlists/command-add',{song:m[1],playlist:m[2]});out.textContent=`Added ${r.song} to ${r.playlist}.`;}
-      if(call){const r=await API.get('/api/voice/call?name='+encodeURIComponent(call[1]));location.href=r.tel_link;}
-      if(place)location.href=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place[1])}`;
-      if(meet){const r=await API.post('/api/voice/meet',{});out.innerHTML=`Meet link: <a href="${UI.esc(r.meet_link)}" target="_blank" rel="noopener">Open meeting</a>`;}
-    }catch(error){if(m&&/connect spotify/i.test(error.message)){try{const r=await API.post('/api/playlists/spotify/login-url',{});location.href=r.url;return;}catch(e){UI.toast(e.message);return;}}if(meet&&/connect google/i.test(error.message)){try{const r=await API.post('/api/voice/google/login-url',{});location.href=r.url;return;}catch(e){UI.toast(e.message);return;}}UI.toast(error.message);}},'Continue');
+      if(command.intent==='spotify_add'){const r=await API.post('/api/playlists/command-add',{song:command.song,playlist:command.playlist,currently_playing:command.currentlyPlaying});out.textContent=`Added ${r.song} to ${r.playlist}.`;}
+      if(command.intent==='call'){const r=await API.get('/api/voice/call?name='+encodeURIComponent(command.name));location.href=r.tel_link;}
+      if(command.intent==='directions')location.href=`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(command.place)}`;
+      if(command.intent==='meet'){const r=await API.post('/api/voice/meet',{});out.innerHTML=`Meet link: <a href="${UI.esc(r.meet_link)}" target="_blank" rel="noopener">Open meeting</a>`;}
+    }catch(error){if(command.intent==='spotify_add'&&/connect spotify/i.test(error.message)){try{const r=await API.post('/api/playlists/spotify/login-url',{});location.href=r.url;return;}catch(e){UI.toast(e.message);return;}}if(command.intent==='meet'&&/connect google/i.test(error.message)){try{const r=await API.post('/api/voice/google/login-url',{});location.href=r.url;return;}catch(e){UI.toast(e.message);return;}}UI.toast(error.message);}},'Continue');
   },
   stopMicStream() { this.micStream?.getTracks().forEach((track) => track.stop()); this.micStream = null; },
   async requestMic() {
@@ -139,7 +139,7 @@ const Voice = {
     catch { this.resetMic(); UI.toast('Could not start speech recognition. Try again.'); }
   },
   async processText(text) {
-    if (/^add\s+.+\s+to\s+.+$/i.test(text) || /^create (?:a )?meet link$/i.test(text) || /^call\s+.+$/i.test(text) || /^take me to\s+.+$/i.test(text)) return this.command(text);
+    if (/^add\s+.+\s+to\s+.+$/i.test(text) || /^create\s+(?:a\s+)?(?:(?:google)\s+)?meet\s+link[\s.,!?;:]*$/i.test(text) || /^call\s+.+$/i.test(text) || /^take\s+me\s+to\s+.+$/i.test(text)) return this.command(text);
     document.getElementById('micText').textContent = `“${text}”`;
     document.getElementById('micHint').textContent = 'Preparing a review…';
     try {

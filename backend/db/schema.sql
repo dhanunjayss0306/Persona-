@@ -31,14 +31,16 @@ create table if not exists contacts (
 
 -- ---------- REMINDERS ----------
 -- type: 'once'  -> notify a single time (birthdays, small things)
--- type: 'nag'   -> notify every 5 min until a proof row exists (work)
+-- type: 'nag'   -> repeat every 5 minutes until marked done (proof optional)
+-- type: 'plain' -> quiet task, no nagging
 -- status: 'pending' -> 'ringing' -> 'done' | 'notified' (once-type after firing)
 create table if not exists reminders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references users(id) on delete cascade,
   title text not null,
   details text,
-  type text not null check (type in ('once','nag')),
+  type text not null check (type in ('once','nag','plain')),
+  item_type text not null default 'task',
   due_at timestamptz not null,
   proof_required boolean default true,
   status text not null default 'pending',

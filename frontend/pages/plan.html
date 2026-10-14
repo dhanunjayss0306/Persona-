@@ -31,7 +31,7 @@
           <button class="btn primary calendarAddTop" id="calAdd"><span aria-hidden="true">+</span> Add to calendar</button>
         </section>
         <section class="calendarMonthCard" aria-label="Monthly calendar">
-          <header class="calHead"><button class="iconBtn" id="calPrev" aria-label="Previous period">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext" aria-label="Next period">›</button></header><div class="seg calendarViews" id="calViews" role="tablist" aria-label="Calendar view"><button data-cal-view="month" class="on">Month</button><button data-cal-view="week">Week</button><button data-cal-view="day">Day</button><button data-cal-view="agenda">Agenda</button></div>
+          <header class="calHead"><button class="iconBtn" id="calPrev" aria-label="Previous period">‹</button><h2 class="display sm" id="calTitle"></h2><button class="iconBtn" id="calNext" aria-label="Next period">›</button><button class="btn sm" id="calToday" type="button">Today</button></header><div class="seg calendarViews" id="calViews" role="tablist" aria-label="Calendar view"><button data-cal-view="month" class="on">Month</button><button data-cal-view="week">Week</button><button data-cal-view="day">Day</button><button data-cal-view="agenda">Agenda</button></div>
           <div class="calGrid" id="calGrid"></div>
           <div class="calendarLegend"><span><i class="legendDot"></i> Things planned</span><span><i class="legendToday"></i> Today</span></div>
         </section>
@@ -39,7 +39,7 @@
       </main>
     </section>
 
-    <section class="planPane" id="page-tasks" role="tabpanel" hidden><main class="pad planInnerPage"><header class="planPaneHeading"><span class="eyebrow">KEEP THE NEXT STEP CLEAR</span><h2>Tasks</h2><p>Assignments and personal reminders in one list.</p></header><div class="seg" id="taskSeg" role="tablist" aria-label="Task status"><button data-task-filter="today" class="on">Today</button><button data-task-filter="upcoming">Upcoming</button><button data-task-filter="overdue">Overdue</button><button data-task-filter="done">Done</button></div><div id="taskList"></div><button class="fab" id="taskAdd" aria-label="Add task">+</button></main></section>
+    <section class="planPane" id="page-tasks" role="tabpanel" hidden><main class="pad planInnerPage"><header class="planPaneHeading"><span class="eyebrow">KEEP THE NEXT STEP CLEAR</span><h2>Tasks</h2><p>Assignments and personal reminders in one list.</p></header><div class="seg" id="taskSeg" role="tablist" aria-label="Task status"><button data-task-filter="today" class="on">Today</button><button data-task-filter="upcoming">Upcoming</button><button data-task-filter="overdue">Overdue</button><button data-task-filter="done">Done</button><button data-task-filter="history">History</button></div><div id="taskList"></div><button class="fab" id="taskAdd" aria-label="Add task">+</button></main></section>
 
     <section class="planPane" id="page-reminders" role="tabpanel" hidden>
       <main class="pad planInnerPage">

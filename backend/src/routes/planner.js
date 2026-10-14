@@ -101,9 +101,9 @@ router.post('/confirm', requireAuth, async (req, res) => {
     if (spread) {
       distribution.forEach(({day,minutes}) => { const blocks=byDay.get(day)||[]; blocks.push({ title:item.title, minutes, kind:item.type, priority:item.priority }); byDay.set(day,blocks); });
     }
-    if (!['exam'].includes(item.type)) dates.forEach((day) => calendarRows.push({ title:item.title, details:item.notes||'', event_date:day, start_time:item.type==='study'?'17:00:00':'09:00:00' }));
+    if (!['exam','event'].includes(item.type)) dates.forEach((day) => calendarRows.push({ title:item.title, details:item.notes||'', event_date:day, start_time:item.type==='study'?'17:00:00':'09:00:00' }));
     if (['assignment','exam'].includes(item.type) || /hackathon/i.test(item.title)) {
-      reminderRows.push({ title:item.title, details:`You have an assignment due today: ${item.title}`, type:'nag', due_at:localDateTimeUtc(date,9,0,timezone) });
+      reminderRows.push({ title:item.title, item_type:item.type, details:`You have an assignment due today: ${item.title}`, type:'nag', due_at:localDateTimeUtc(date,9,0,timezone) });
     }
   }
   const dayRows = [...byDay].map(([day, blocks]) => ({ day, blocks }));

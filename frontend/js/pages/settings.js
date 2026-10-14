@@ -47,6 +47,7 @@ async function initSettings() {
       ${UI.field('Field', `<input id="pfField" value="${UI.esc(user.field_of_study || '')}">`)}
       ${UI.field('Degrees', `<input id="pfDeg" value="${UI.esc(user.degrees || '')}">`)}
       ${UI.field('Bio', `<input id="pfBio" value="${UI.esc(user.bio || '')}">`)}
+      ${UI.field('Timezone', `<input id="pfTimezone" value="${UI.esc(user.timezone || 'Asia/Kolkata')}" placeholder="Asia/Kolkata" autocomplete="off">`)}
       <button class="btn primary" id="pfSave" style="width:100%">Save profile</button>`;
     document.getElementById('pfSave').onclick = async () => {
       await API.patch('/api/auth/me', {
@@ -54,6 +55,7 @@ async function initSettings() {
         field_of_study: document.getElementById('pfField').value.trim(),
         degrees: document.getElementById('pfDeg').value.trim(),
         bio: document.getElementById('pfBio').value.trim(),
+        timezone: document.getElementById('pfTimezone').value.trim(),
       });
       UI.toast('Profile saved');
     };

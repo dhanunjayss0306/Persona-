@@ -18,12 +18,12 @@ const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req,
 
 // POST /api/reminders  {title, details?, type: 'once'|'nag'|'plain', due_at, proof_required?}
 router.post('/', requireAuth, asyncRoute(async (req, res) => {
-  const { title, details, type, due_at, proof_required } = req.body || {};
+  const { title, details, type, item_type, due_at, proof_required } = req.body || {};
   if (!title || !type || !due_at) return res.status(400).json({ error: 'title, type, due_at required' });
   if (!['once', 'nag', 'plain'].includes(type)) return res.status(400).json({ error: "type must be 'once', 'nag', or 'plain'" });
 
   const { data, error } = await supabase.from('reminders').insert({
-    user_id: req.user.id, title, details: details || null, type, due_at,
+    user_id: req.user.id, title, details: details || null, type, item_type: item_type || 'task', due_at,
     proof_required: proof_required !== false,
   }).select().single();
   if (error) return res.status(500).json({ error: error.message });
@@ -50,10 +50,18 @@ router.get('/:id', requireAuth, async (req, res) => {
 // PATCH /api/reminders/:id — update a task: title, details, due date,
 // type, or mark status. {title?, details?, type?, due_at?, proof_required?, status?}
 router.patch('/:id', requireAuth, async (req, res) => {
-  const allowed = ['title', 'details', 'type', 'due_at', 'proof_required', 'status'];
+  const allowed = ['title', 'details', 'type', 'item_type', 'due_at', 'proof_required', 'status'];
   const patch = {};
   for (const k of allowed) if (req.body?.[k] !== undefined) patch[k] = req.body[k];
-  if (patch.due_at !== undefined) Object.assign(patch, reminderRearm(patch.due_at));
+  if (patch.due_at !== undefined) {
+    const { data: current, error: readError } = await supabase.from('reminders').select('id,due_at,status')
+      .eq('id', req.params.id).eq('user_id', req.user.id).maybeSingle();
+    if (readError) return res.status(500).json({ error: readError.message });
+    if (!current) return res.status(404).json({ error: 'Not found' });
+    const changed = Date.parse(patch.due_at) !== Date.parse(current.due_at);
+    if (current.status === 'done') patch.status = 'done';
+    else if (changed) Object.assign(patch, reminderRearm(patch.due_at));
+  }
   if (patch.type && !['once', 'nag', 'plain'].includes(patch.type)) {
     return res.status(400).json({ error: "type must be 'once', 'nag', or 'plain'" });
   }

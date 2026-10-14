@@ -7,6 +7,7 @@ function initCalendar() {
   Cal.y = now.getFullYear(); Cal.m = now.getMonth(); Cal.sel = localISODate(now);
   document.getElementById('calPrev').onclick = () => Cal.moveMonth(-1);
   document.getElementById('calNext').onclick = () => Cal.moveMonth(1);
+  document.getElementById('calToday').onclick = () => { const today = new Date(); Cal.y = today.getFullYear(); Cal.m = today.getMonth(); Cal.sel = localISODate(today); Cal.draw(); };
   document.getElementById('calAdd').onclick = () => Cal.add();
   document.querySelectorAll('[data-cal-view]').forEach((button) => button.onclick = () => { Cal.view = button.dataset.calView; document.querySelectorAll('[data-cal-view]').forEach((tab) => tab.classList.toggle('on', tab === button)); Cal.draw(); });
   Cal.draw();

@@ -1,6 +1,5 @@
 /* today.js — greeting + today's agenda from the merged calendar feed. */
 async function initToday() {
-  unlockAlarmAudio();
   let timezone='Asia/Kolkata'; try { timezone=(await API.get('/api/auth/me')).user?.timezone||timezone; } catch(error) { console.error('Could not load profile timezone:',error.message); }
   const u = Auth.user();
   const h = new Date().getHours();
@@ -58,12 +57,6 @@ async function renderUpcomingExamPrompt(box) {
     document.getElementById('todayExamPlan').onclick = () => go('planner');
   } catch (error) { box.insertAdjacentHTML('afterbegin', `<p class="muted sm" role="alert">Could not load exam dates: ${UI.esc(error.message)}</p>`); }
 }
-
-let stickyAlarmContext=null, stickyAlarmTimer=null, stickyAlarmStopped=false;
-function unlockAlarmAudio(){ document.addEventListener('pointerdown',()=>{ if(!stickyAlarmContext){const C=window.AudioContext||window.webkitAudioContext;if(C)stickyAlarmContext=new C();} stickyAlarmContext?.resume?.(); },{once:true}); }
-function playStickyAlarm(){ if(stickyAlarmStopped||!stickyAlarmContext)return; const osc=stickyAlarmContext.createOscillator(),gain=stickyAlarmContext.createGain();osc.frequency.value=880;gain.gain.value=.12;osc.connect(gain);gain.connect(stickyAlarmContext.destination);osc.start();osc.stop(stickyAlarmContext.currentTime+.35);stickyAlarmTimer=setTimeout(playStickyAlarm,900); }
-async function checkStickyAlarm(){ try {const reminders=await API.get('/api/reminders');const due=reminders.some(r=>r.type==='nag'&&r.status!=='done'&&new Date(r.due_at)<=new Date());if(due&&!stickyAlarmStopped){if(!document.getElementById('stickyAlarmStop')){const b=document.createElement('button');b.id='stickyAlarmStop';b.className='btn danger';b.textContent='Stop alarm';b.style.cssText='position:fixed;z-index:1000;right:18px;bottom:90px';b.onclick=()=>{stickyAlarmStopped=true;clearTimeout(stickyAlarmTimer);b.remove();};document.body.append(b);}playStickyAlarm();}}catch(error){console.error('Sticky alarm status unavailable:',error.message);} }
-setInterval(checkStickyAlarm,30000);
 
 async function renderActiveSticky(box) {
   try {

@@ -61,7 +61,7 @@ const Reminders = {
     const r = await API.get(`/api/reminders/${id}`);
     const proofs = await API.get(`/api/reminders/${id}/proofs`).catch(() => []);
     UI.sheet(`<h3 style="font-family:var(--font-d);font-size:22px;margin-bottom:6px">${UI.esc(r.title)}</h3>
-      <p class="muted sm" style="margin-bottom:12px">${r.type === 'nag' ? 'STRICT — nags every 5 min until you prove it' : 'One-time'} · ${UI.dt(r.due_at)} · ${r.status}</p>
+      <p class="muted sm" style="margin-bottom:12px">${r.type === 'nag' ? 'Sticky — repeats every 5 min until Done; proof is optional' : 'One-time'} · ${UI.dt(r.due_at)} · ${r.status}</p>
       ${r.details ? `<p style="margin-bottom:12px">${UI.esc(r.details)}</p>` : ''}
       ${proofs.length ? `<p class="kicker">Proof submitted</p>` + proofs.map((p) => `<p class="sm">✓ ${p.kind}${p.text ? ' — ' + UI.esc(p.text) : ''}${p.file_url ? ` — <a href="${p.file_url}" target="_blank">view</a>` : ''}</p>`).join('') : ''}
       ${r.status !== 'done' ? `
@@ -146,13 +146,15 @@ Tasks.render = async function () {
     ];
     const filtered = tasks.filter((task) => {
       const due=new Date(task.due);
-      if(this.filter==='done') return task.done;
+      if(this.filter==='history') return task.source==='context' && due<today;
+      if(this.filter==='done') return task.source==='reminder' && task.done;
+      if(task.source==='context') return false;
       if(task.done) return false;
       if(this.filter==='today') return due>=today && due<new Date(today.getTime()+864e5);
       if(this.filter==='overdue') return due<today;
       return due>=new Date(today.getTime()+864e5);
     }).sort((a,b)=>new Date(a.due)-new Date(b.due));
-    box.innerHTML = filtered.length ? filtered.map((task) => `<div class="rem taskRow${task.done?' done':''}" data-task-source="${task.source}" data-task-id="${UI.esc(task.id)}"><div class="dot"></div><div class="t"><b>${UI.esc(task.title)}</b><span>${UI.esc(task.detail)} · ${UI.d(task.due)}</span></div>${task.source==='reminder'?`<button class="btn sm" data-task-edit="${UI.esc(task.id)}">Edit</button>${task.done?'':`<button class="btn primary sm" data-task-done="${UI.esc(task.id)}">Done</button>`}<button class="btn sm" data-task-delete="${UI.esc(task.id)}" aria-label="Delete ${UI.esc(task.title)}">×</button>`:'<span class="badge">Context</span>'}</div>`).join('') : `<div class="card center"><p><b>No ${this.filter} items.</b></p><p class="muted sm">A little space to breathe, or add a task when you’re ready.</p></div>`;
+    box.innerHTML = filtered.length ? filtered.map((task) => `<div class="rem taskRow${task.done?' done':''}" data-task-source="${task.source}" data-task-id="${UI.esc(task.id)}"><div class="dot"></div><div class="t"><b>${UI.esc(task.title)}</b><span>${UI.esc(task.detail)} · ${UI.d(task.due)}</span></div>${task.source==='reminder'?`<button class="btn sm" data-task-edit="${UI.esc(task.id)}">Edit</button>${task.done?'':`<button class="btn primary sm" data-task-done="${UI.esc(task.id)}">Done</button>`}<button class="btn sm" data-task-delete="${UI.esc(task.id)}" aria-label="Delete ${UI.esc(task.title)}">×</button>`:'<span class="badge">History</span>'}</div>`).join('') : `<div class="card center"><p><b>No ${this.filter} items.</b></p><p class="muted sm">A little space to breathe, or add a task when you’re ready.</p></div>`;
     box.querySelectorAll('[data-task-edit]').forEach((button) => button.onclick=(event)=>{event.stopPropagation();Reminders.detail(button.dataset.taskEdit);});
     box.querySelectorAll('[data-task-done]').forEach((button) => button.onclick=async(event)=>{event.stopPropagation();try{await API.patch(`/api/reminders/${button.dataset.taskDone}`,{status:'done'});await Tasks.render();UI.toast('Task done');}catch(error){UI.toast(error.message);}});
     box.querySelectorAll('[data-task-plan-done]').forEach((button) => button.onclick=async()=>{const [plan_id,day]=button.dataset.taskPlanDone.split('|');try{await API.post('/api/planner/day-done',{plan_id,day});await Tasks.render();UI.toast('Study day complete');}catch(error){UI.toast(error.message);}});
