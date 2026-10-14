@@ -39,14 +39,20 @@ router.post('/parse', requireAuth, async (req, res) => {
       const title = it.end != null
         ? `${it.title} (${Math.floor(it.start / 60)}:${String(it.start % 60).padStart(2, '0')}–${Math.floor(it.end / 60)}:${String(it.end % 60).padStart(2, '0')})`
         : it.title;
-      const { data, error } = await supabase.from('reminders').insert({
+      const row = {
         user_id: req.user.id,
         title: title.charAt(0).toUpperCase() + title.slice(1),
         details: isWork ? null : `Added from voice input.`,
         type: isWork ? 'nag' : 'once', item_type: it.kind,
         due_at,
-      }).select().single();
-      if (error) return res.status(500).json({ error: `Could not create "${it.title}": ${error.message}`, created: created.map((c) => ({ id: c.id, title: c.title })) });
+      };
+      let { data, error } = await supabase.from('reminders').insert(row).select().single();
+      if (error && /item_type/i.test(error.message)) {
+        // Database predates migration 005 — save without the new column instead of 500ing.
+        const { item_type: _dropped, ...legacy } = row;
+        ({ data, error } = await supabase.from('reminders').insert(legacy).select().single());
+      }
+      if (error) return res.status(500).json({ error: `Could not create "${it.title}": ${error.message}${/item_type/i.test(error.message) ? ' (Run migration 005 in Supabase: alter table reminders add column if not exists item_type text not null default \'task\'.)' : ''}`, created: created.map((c) => ({ id: c.id, title: c.title })) });
       created.push(data);
     }
   }

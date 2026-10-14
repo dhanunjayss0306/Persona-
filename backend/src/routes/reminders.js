@@ -22,10 +22,17 @@ router.post('/', requireAuth, asyncRoute(async (req, res) => {
   if (!title || !type || !due_at) return res.status(400).json({ error: 'title, type, due_at required' });
   if (!['once', 'nag', 'plain'].includes(type)) return res.status(400).json({ error: "type must be 'once', 'nag', or 'plain'" });
 
-  const { data, error } = await supabase.from('reminders').insert({
+  let { data, error } = await supabase.from('reminders').insert({
     user_id: req.user.id, title, details: details || null, type, item_type: item_type || 'task', due_at,
     proof_required: proof_required !== false,
   }).select().single();
+  if (error && /item_type/i.test(error.message)) {
+    // Database predates migration 005 — save without the new column instead of 500ing.
+    ({ data, error } = await supabase.from('reminders').insert({
+      user_id: req.user.id, title, details: details || null, type, due_at,
+      proof_required: proof_required !== false,
+    }).select().single());
+  }
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
 }));

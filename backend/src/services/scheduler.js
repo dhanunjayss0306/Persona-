@@ -13,17 +13,29 @@ const { stickyNag } = require('./behavior');
 
 const NAG_INTERVAL_MIN = 5;
 
-async function nagTick() {
+async function selectNags(status) {
   const now = new Date().toISOString();
   const fiveMinAgo = new Date(Date.now() - NAG_INTERVAL_MIN * 60000).toISOString();
+  let q = supabase.from('reminders').select('id,user_id,title,item_type')
+    .eq('type', 'nag').eq('status', status).lte('due_at', now);
+  if (status === 'ringing') q = q.or(`last_nagged_at.is.null,last_nagged_at.lte.${fiveMinAgo}`);
+  const first = await q;
+  if (!first.error) return first.data;
+  if (!/item_type/i.test(first.error.message)) throw new Error(first.error.message);
+  // Database predates migration 005 — same query without the new column.
+  let legacy = supabase.from('reminders').select('id,user_id,title')
+    .eq('type', 'nag').eq('status', status).lte('due_at', now);
+  if (status === 'ringing') legacy = legacy.or(`last_nagged_at.is.null,last_nagged_at.lte.${fiveMinAgo}`);
+  const second = await legacy;
+  if (second.error) throw new Error(second.error.message);
+  return (second.data || []).map((r) => ({ ...r, item_type: 'task' }));
+}
 
+async function nagTick() {
   // Work nags: due + not done + (never nagged OR 5 min since last nag).
-  const { data: nags } = await supabase.from('reminders').select('id,user_id,title,item_type')
-    .eq('type', 'nag').eq('status', 'ringing').lte('due_at', now)
-    .or(`last_nagged_at.is.null,last_nagged_at.lte.${fiveMinAgo}`);
+  const nags = await selectNags('ringing');
   // Freshly due nags move pending -> ringing.
-  const { data: fresh } = await supabase.from('reminders').select('id,user_id,title,item_type')
-    .eq('type', 'nag').eq('status', 'pending').lte('due_at', now);
+  const fresh = await selectNags('pending');
   for (const r of fresh || []) {
     await supabase.from('reminders').update({ status: 'ringing' }).eq('id', r.id);
   }
