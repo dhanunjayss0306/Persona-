@@ -13,6 +13,13 @@ const supabase = require('../db');
 let ready = false;
 (function init() {
   try {
+    const rawJson = process.env.FCM_SERVICE_ACCOUNT_JSON;
+    if (rawJson) {
+      admin.initializeApp({ credential: admin.credential.cert(JSON.parse(rawJson)) });
+      ready = true;
+      console.log('[push] FCM ready');
+      return;
+    }
     const raw = process.env.FCM_SERVICE_ACCOUNT_PATH;
     const path = raw ? nodePath.resolve(raw) : null;
     if (path && fs.existsSync(path)) {
