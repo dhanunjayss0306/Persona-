@@ -1,6 +1,6 @@
 /* api.js — one function for every backend call. */
 const API = {
-  get base() { return localStorage.getItem('persona_api') || 'http://localhost:3001'; },
+  get base() { return localStorage.getItem('persona_api') || (['localhost','127.0.0.1'].includes(location.hostname) ? 'http://localhost:3001' : 'https://p01--persona-backend--d9zv9jp8tnxx.code.run'); },
   get token() { return localStorage.getItem('persona_token'); },
   async call(path, { method = 'GET', body, form } = {}) {
     const headers = {};
